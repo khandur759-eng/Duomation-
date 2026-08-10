@@ -40,31 +40,43 @@ export default function App() {
 
   // Action: Create New Animation (Device A Drawing)
   const handleCreateNewProject = async () => {
-    const project = createNewProject('My 2D Animation');
-    await saveProject(project);
-    setCurrentProject(project);
+    try {
+      const project = createNewProject('My 2D Animation');
+      setCurrentProject(project);
+      setMode('draw');
 
-    // Create Socket room for two-device pairing
-    await syncService.createSession(project);
-    setMode('draw');
+      // Asynchronous background operations: local save & Socket room session establishment
+      saveProject(project).catch((err) => console.error('Background save project error:', err));
+      syncService.createSession(project).catch((err) => console.warn('Background create session error:', err));
+    } catch (err) {
+      console.error('Error creating new project:', err);
+    }
   };
 
   // Action: Open Existing Saved Project
   const handleOpenProject = async (id: string) => {
-    const loaded = await loadProject(id);
-    if (loaded) {
-      setCurrentProject(loaded);
-      await syncService.createSession(loaded);
-      setMode('draw');
+    try {
+      const loaded = await loadProject(id);
+      if (loaded) {
+        setCurrentProject(loaded);
+        setMode('draw');
+        syncService.createSession(loaded).catch((err) => console.warn('Background create session error:', err));
+      }
+    } catch (err) {
+      console.error('Error opening project:', err);
     }
   };
 
   // Action: Import JSON Project
   const handleImportProject = async (project: Project) => {
-    await saveProject(project);
-    setCurrentProject(project);
-    await syncService.createSession(project);
-    setMode('draw');
+    try {
+      setCurrentProject(project);
+      setMode('draw');
+      saveProject(project).catch((err) => console.error('Background save imported project error:', err));
+      syncService.createSession(project).catch((err) => console.warn('Background create session error:', err));
+    } catch (err) {
+      console.error('Error importing project:', err);
+    }
   };
 
   // Action: Join Session by 6-digit Code or QR scan

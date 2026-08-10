@@ -150,51 +150,96 @@ class SyncService {
 
   public createSession(project: Project): Promise<{ success: boolean; sessionId?: string; code?: string; error?: string }> {
     return new Promise((resolve) => {
-      if (!this.socket) this.init();
-      this.socket?.emit('create-session', { project }, (res: any) => {
-        if (res && res.success) {
-          this.setStoredSession(res.sessionId, res.code, 'draw');
-          this.updateState({
-            active: true,
-            sessionId: res.sessionId,
-            code: res.code,
-            role: 'draw',
-            connectedDevices: res.connectedDevices || 1,
-            statusText: 'Session Active',
-          });
-          resolve({ success: true, sessionId: res.sessionId, code: res.code });
-        } else {
-          resolve({ success: false, error: res?.error || 'Failed to create session.' });
+      try {
+        if (!this.socket) this.init();
+
+        let resolved = false;
+        const timer = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            console.warn('createSession timeout reached waiting for socket response.');
+            resolve({ success: false, error: 'Session creation timeout' });
+          }
+        }, 4000);
+
+        if (!this.socket) {
+          clearTimeout(timer);
+          resolve({ success: false, error: 'Socket not initialized' });
+          return;
         }
-      });
+
+        this.socket.emit('create-session', { project }, (res: any) => {
+          if (resolved) return;
+          resolved = true;
+          clearTimeout(timer);
+          if (res && res.success) {
+            this.setStoredSession(res.sessionId, res.code, 'draw');
+            this.updateState({
+              active: true,
+              sessionId: res.sessionId,
+              code: res.code,
+              role: 'draw',
+              connectedDevices: res.connectedDevices || 1,
+              statusText: 'Session Active',
+            });
+            resolve({ success: true, sessionId: res.sessionId, code: res.code });
+          } else {
+            resolve({ success: false, error: res?.error || 'Failed to create session.' });
+          }
+        });
+      } catch (e: any) {
+        resolve({ success: false, error: e?.message || 'Socket error' });
+      }
     });
   }
 
   public joinSession(codeOrId: string, role: DeviceRole = 'display'): Promise<{ success: boolean; project?: Project; sessionId?: string; code?: string; error?: string }> {
     return new Promise((resolve) => {
-      if (!this.socket) this.init();
-      this.socket?.emit('join-session', { sessionKey: codeOrId, role }, (res: any) => {
-        if (res && res.success) {
-          this.setStoredSession(res.sessionId, res.code, role);
-          this.updateState({
-            active: true,
-            sessionId: res.sessionId,
-            code: res.code,
-            role,
-            connectedDevices: res.connectedDevices || 2,
-            statusText: role === 'display' ? 'Display Mode Active' : 'Drawing Mode Active',
-          });
-          resolve({
-            success: true,
-            project: res.project,
-            sessionId: res.sessionId,
-            code: res.code,
-          });
-        } else {
-          this.clearStoredSession();
-          resolve({ success: false, error: res?.error || 'Invalid session code or room expired.' });
+      try {
+        if (!this.socket) this.init();
+
+        let resolved = false;
+        const timer = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            resolve({ success: false, error: 'Join session timed out. Please check connection and try again.' });
+          }
+        }, 5000);
+
+        if (!this.socket) {
+          clearTimeout(timer);
+          resolve({ success: false, error: 'Socket not initialized' });
+          return;
         }
-      });
+
+        this.socket.emit('join-session', { sessionKey: codeOrId, role }, (res: any) => {
+          if (resolved) return;
+          resolved = true;
+          clearTimeout(timer);
+          if (res && res.success) {
+            this.setStoredSession(res.sessionId, res.code, role);
+            this.updateState({
+              active: true,
+              sessionId: res.sessionId,
+              code: res.code,
+              role,
+              connectedDevices: res.connectedDevices || 2,
+              statusText: role === 'display' ? 'Display Mode Active' : 'Drawing Mode Active',
+            });
+            resolve({
+              success: true,
+              project: res.project,
+              sessionId: res.sessionId,
+              code: res.code,
+            });
+          } else {
+            this.clearStoredSession();
+            resolve({ success: false, error: res?.error || 'Invalid session code or room expired.' });
+          }
+        });
+      } catch (e: any) {
+        resolve({ success: false, error: e?.message || 'Socket error' });
+      }
     });
   }
 

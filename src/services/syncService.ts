@@ -15,6 +15,7 @@ class SyncService {
   private socket: Socket | null = null;
   private listeners: Set<SyncEventCallback> = new Set();
   private pingInterval: any = null;
+  private isCreatingSession = false;
 
   private state: SessionState = {
     active: false,
@@ -27,7 +28,13 @@ class SyncService {
   public init() {
     if (this.socket) return;
 
-    this.socket = io({
+    const socketUrl =
+      (import.meta as any).env?.VITE_SOCKET_URL ||
+      (import.meta as any).env?.VITE_APP_URL ||
+      (typeof window !== 'undefined' ? window.location.origin : '');
+
+    this.socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
       autoConnect: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
@@ -55,6 +62,20 @@ class SyncService {
     this.socket.on('disconnect', () => {
       this.updateState({ active: false, statusText: 'Reconnecting...' });
       this.notifyListeners('disconnected', null);
+    });
+
+    this.socket.on('connect_error', (err) => {
+      console.warn('Socket connection error:', err?.message || err);
+      this.updateState({ statusText: 'Connection Error (retrying...)' });
+      this.notifyListeners('connect_error', err);
+    });
+
+    this.socket.on('reconnect_attempt', (attempt) => {
+      this.updateState({ statusText: `Reconnecting (attempt ${attempt})...` });
+    });
+
+    this.socket.on('reconnect_error', (err) => {
+      this.updateState({ statusText: 'Reconnection Error' });
     });
 
     this.socket.on('session-status', (data: { connectedDevices: number; hasDisplayDevice: boolean; hasDrawDevice?: boolean }) => {
@@ -96,6 +117,35 @@ class SyncService {
     this.socket.on('sync-snapshot', (data: { project: Project; activeFrameIndex?: number }) => {
       this.updateState({ lastSyncTime: Date.now() });
       this.notifyListeners('sync-snapshot', data);
+    });
+  }
+
+  private ensureConnected(): Promise<boolean> {
+    return new Promise((resolve) => {
+      if (!this.socket) this.init();
+      if (!this.socket) return resolve(false);
+
+      if (this.socket.connected) {
+        return resolve(true);
+      }
+
+      let done = false;
+      const onConnect = () => {
+        if (!done) {
+          done = true;
+          resolve(true);
+        }
+      };
+
+      this.socket.once('connect', onConnect);
+
+      setTimeout(() => {
+        if (!done) {
+          done = true;
+          this.socket?.off('connect', onConnect);
+          resolve(Boolean(this.socket?.connected));
+        }
+      }, 4000);
     });
   }
 
@@ -148,29 +198,34 @@ class SyncService {
     } catch (e) {}
   }
 
-  public createSession(project: Project): Promise<{ success: boolean; sessionId?: string; code?: string; error?: string }> {
-    return new Promise((resolve) => {
-      try {
-        if (!this.socket) this.init();
+  public async createSession(project: Project): Promise<{ success: boolean; sessionId?: string; code?: string; error?: string }> {
+    if (this.isCreatingSession && this.state.sessionId && this.state.code) {
+      return { success: true, sessionId: this.state.sessionId, code: this.state.code };
+    }
 
+    this.isCreatingSession = true;
+    try {
+      await this.ensureConnected();
+      if (!this.socket) {
+        this.isCreatingSession = false;
+        return { success: false, error: 'Socket not initialized' };
+      }
+
+      return await new Promise((resolve) => {
         let resolved = false;
         const timer = setTimeout(() => {
           if (!resolved) {
             resolved = true;
+            this.isCreatingSession = false;
             console.warn('createSession timeout reached waiting for socket response.');
             resolve({ success: false, error: 'Session creation timeout' });
           }
-        }, 4000);
+        }, 5000);
 
-        if (!this.socket) {
-          clearTimeout(timer);
-          resolve({ success: false, error: 'Socket not initialized' });
-          return;
-        }
-
-        this.socket.emit('create-session', { project }, (res: any) => {
+        this.socket?.emit('create-session', { project }, (res: any) => {
           if (resolved) return;
           resolved = true;
+          this.isCreatingSession = false;
           clearTimeout(timer);
           if (res && res.success) {
             this.setStoredSession(res.sessionId, res.code, 'draw');
@@ -187,32 +242,30 @@ class SyncService {
             resolve({ success: false, error: res?.error || 'Failed to create session.' });
           }
         });
-      } catch (e: any) {
-        resolve({ success: false, error: e?.message || 'Socket error' });
-      }
-    });
+      });
+    } catch (e: any) {
+      this.isCreatingSession = false;
+      return { success: false, error: e?.message || 'Socket error' };
+    }
   }
 
-  public joinSession(codeOrId: string, role: DeviceRole = 'display'): Promise<{ success: boolean; project?: Project; sessionId?: string; code?: string; error?: string }> {
-    return new Promise((resolve) => {
-      try {
-        if (!this.socket) this.init();
+  public async joinSession(codeOrId: string, role: DeviceRole = 'display'): Promise<{ success: boolean; project?: Project; sessionId?: string; code?: string; error?: string }> {
+    try {
+      await this.ensureConnected();
+      if (!this.socket) {
+        return { success: false, error: 'Socket not initialized' };
+      }
 
+      return await new Promise((resolve) => {
         let resolved = false;
         const timer = setTimeout(() => {
           if (!resolved) {
             resolved = true;
             resolve({ success: false, error: 'Join session timed out. Please check connection and try again.' });
           }
-        }, 5000);
+        }, 6000);
 
-        if (!this.socket) {
-          clearTimeout(timer);
-          resolve({ success: false, error: 'Socket not initialized' });
-          return;
-        }
-
-        this.socket.emit('join-session', { sessionKey: codeOrId, role }, (res: any) => {
+        this.socket?.emit('join-session', { sessionKey: codeOrId, role }, (res: any) => {
           if (resolved) return;
           resolved = true;
           clearTimeout(timer);
@@ -237,10 +290,10 @@ class SyncService {
             resolve({ success: false, error: res?.error || 'Invalid session code or room expired.' });
           }
         });
-      } catch (e: any) {
-        resolve({ success: false, error: e?.message || 'Socket error' });
-      }
-    });
+      });
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Socket error' };
+    }
   }
 
   // Realtime Drawing Emitters

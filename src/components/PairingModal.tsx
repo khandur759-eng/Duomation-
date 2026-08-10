@@ -33,7 +33,8 @@ export const PairingModal: React.FC<PairingModalProps> = ({
   // Generate QR code for Device A
   useEffect(() => {
     if (code && isOpen) {
-      const fullUrl = `${window.location.origin}?join=${code}`;
+      const appBaseUrl = (import.meta as any).env?.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+      const fullUrl = `${appBaseUrl}?join=${code}`;
       QRCode.toDataURL(fullUrl, { width: 280, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
         .then((url) => setQrDataUrl(url))
         .catch(console.error);
@@ -104,7 +105,8 @@ export const PairingModal: React.FC<PairingModalProps> = ({
 
   if (!isOpen) return null;
 
-  const joinLink = code ? `${window.location.origin}?join=${code}` : '';
+  const appBaseUrl = (import.meta as any).env?.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+  const joinLink = code ? `${appBaseUrl}?join=${code}` : '';
 
   const handleCopyLink = () => {
     if (joinLink) {

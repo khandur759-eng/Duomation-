@@ -1,30 +1,79 @@
 export function getPublicAppUrl(): string {
-  let url =
-    (import.meta as any).env?.VITE_APP_URL ||
-    (typeof window !== 'undefined' ? window.location.origin : '');
+  let envUrl = (import.meta as any).env?.VITE_APP_URL;
+  if (typeof envUrl === 'string') {
+    envUrl = envUrl.trim();
+  }
 
-  if (!url || url.includes('localhost') || url.includes('127.0.0.1')) {
-    // If running in browser and location exists, prefer location.origin if env wasn't set
-    if (typeof window !== 'undefined' && window.location?.origin) {
-      url = window.location.origin;
+  let url = envUrl || '';
+
+  if (!url && typeof window !== 'undefined' && window.location?.origin) {
+    url = window.location.origin;
+  }
+
+  // Validate and normalize
+  if (url) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        // Strip trailing slash
+        let clean = parsed.origin + parsed.pathname;
+        if (clean.endsWith('/')) {
+          clean = clean.slice(0, -1);
+        }
+        return clean;
+      }
+    } catch (e) {}
+  }
+
+  // Fallback to window.location.origin in browser
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    let clean = window.location.origin;
+    if (clean.endsWith('/')) {
+      clean = clean.slice(0, -1);
     }
+    return clean;
   }
 
-  // Strip trailing slash
-  if (url.endsWith('/')) {
-    url = url.slice(0, -1);
-  }
-  return url;
+  return '';
 }
 
 export function getSocketUrl(): string {
-  let url =
-    (import.meta as any).env?.VITE_SOCKET_URL ||
-    (import.meta as any).env?.VITE_APP_URL ||
-    (typeof window !== 'undefined' ? window.location.origin : '');
+  let socketEnv = (import.meta as any).env?.VITE_SOCKET_URL;
+  let appEnv = (import.meta as any).env?.VITE_APP_URL;
 
-  if (url.endsWith('/')) {
-    url = url.slice(0, -1);
+  if (typeof socketEnv === 'string') socketEnv = socketEnv.trim();
+  if (typeof appEnv === 'string') appEnv = appEnv.trim();
+
+  let raw = socketEnv || appEnv || (typeof window !== 'undefined' ? window.location.origin : '');
+
+  if (raw) {
+    try {
+      const parsed = new URL(raw);
+      let clean = parsed.origin;
+      if (clean.endsWith('/')) {
+        clean = clean.slice(0, -1);
+      }
+      return clean;
+    } catch (e) {}
   }
-  return url;
+
+  return typeof window !== 'undefined' ? window.location.origin : '';
 }
+
+export function logDuomationConfig() {
+  if (typeof window === 'undefined') return;
+  const mode = (import.meta as any).env?.MODE || 'production';
+  const appUrl = getPublicAppUrl();
+  const socketUrl = getSocketUrl();
+  const origin = window.location.origin;
+  const protocol = window.location.protocol;
+
+  console.info('[Duomation Config]', {
+    mode,
+    appUrl,
+    socketUrl,
+    origin,
+    protocol,
+  });
+}
+

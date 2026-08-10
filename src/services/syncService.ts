@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { Project, Stroke, ActiveStrokeData, DeviceRole, SessionState } from '../types/animation';
-import { getSocketUrl } from '../utils/url';
+import { getSocketUrl, logDuomationConfig } from '../utils/url';
 
 type SyncEventCallback = (event: string, data: any) => void;
 
@@ -31,6 +31,8 @@ class SyncService {
   public init() {
     if (this.socket) return;
 
+    logDuomationConfig();
+
     const socketUrl = getSocketUrl();
     const envName = (import.meta as any).env?.MODE || 'production';
 
@@ -46,7 +48,10 @@ class SyncService {
     });
 
     this.socket.on('connect', () => {
-      console.log(`[Duomation Sync] Connected to Socket.IO server: ${this.socket?.id}`);
+      console.info('[Duomation Sync] Production realtime connection established', {
+        id: this.socket?.id,
+        transport: (this.socket?.io as any)?.engine?.transport?.name,
+      });
       this.updateState({ statusText: 'Connected' });
       this.startPingCheck();
 
@@ -74,7 +79,7 @@ class SyncService {
     });
 
     this.socket.on('connect_error', (err) => {
-      console.warn('[Duomation Sync] Connection error:', err?.message || err);
+      console.error('[Duomation Sync] Production realtime connection failed:', err?.message || err);
       this.updateState({ statusText: 'Connection Error (retrying...)' });
       this.notifyListeners('connect_error', err);
     });
@@ -146,32 +151,52 @@ class SyncService {
     });
   }
 
-  private ensureConnected(): Promise<boolean> {
+  private ensureConnected(): Promise<{ connected: boolean; error?: string }> {
     return new Promise((resolve) => {
       if (!this.socket) this.init();
-      if (!this.socket) return resolve(false);
+      if (!this.socket) {
+        return resolve({ connected: false, error: 'Socket not initialized' });
+      }
 
       if (this.socket.connected) {
-        return resolve(true);
+        return resolve({ connected: true });
       }
 
       let done = false;
       const onConnect = () => {
         if (!done) {
           done = true;
-          resolve(true);
+          resolve({ connected: true });
+        }
+      };
+
+      const onError = (err: any) => {
+        if (!done) {
+          done = true;
+          this.socket?.off('connect', onConnect);
+          resolve({
+            connected: false,
+            error: err?.message || 'Unable to connect to the Duomation realtime server.',
+          });
         }
       };
 
       this.socket.once('connect', onConnect);
+      this.socket.once('connect_error', onError);
 
       setTimeout(() => {
         if (!done) {
           done = true;
           this.socket?.off('connect', onConnect);
-          resolve(Boolean(this.socket?.connected));
+          this.socket?.off('connect_error', onError);
+          resolve({
+            connected: Boolean(this.socket?.connected),
+            error: this.socket?.connected
+              ? undefined
+              : 'Unable to connect to the Duomation realtime server.',
+          });
         }
-      }, 4000);
+      }, 5000);
     });
   }
 
@@ -243,10 +268,12 @@ class SyncService {
 
     this.isCreatingSession = true;
     try {
-      await this.ensureConnected();
-      if (!this.socket) {
+      const conn = await this.ensureConnected();
+      if (!conn.connected || !this.socket) {
         this.isCreatingSession = false;
-        return { success: false, error: 'Socket not initialized' };
+        const err = conn.error || 'Unable to connect to the Duomation realtime server.';
+        this.updateState({ statusText: 'Connection Failed' });
+        return { success: false, error: err };
       }
 
       return await new Promise((resolve) => {
@@ -255,8 +282,12 @@ class SyncService {
           if (!resolved) {
             resolved = true;
             this.isCreatingSession = false;
-            console.warn('createSession timeout reached waiting for socket response.');
-            resolve({ success: false, error: 'Session creation timeout' });
+            console.warn('[Duomation Sync] createSession timeout reached waiting for server response.');
+            this.updateState({ statusText: 'Server Timeout' });
+            resolve({
+              success: false,
+              error: 'The realtime server did not respond while creating the pairing session.',
+            });
           }
         }, 5000);
 
@@ -277,21 +308,23 @@ class SyncService {
             });
             resolve({ success: true, sessionId: res.sessionId, code: res.code });
           } else {
+            this.updateState({ statusText: 'Session Creation Failed' });
             resolve({ success: false, error: res?.error || 'Failed to create session.' });
           }
         });
       });
     } catch (e: any) {
       this.isCreatingSession = false;
-      return { success: false, error: e?.message || 'Socket error' };
+      this.updateState({ statusText: 'Socket Error' });
+      return { success: false, error: e?.message || 'Unable to connect to the Duomation realtime server.' };
     }
   }
 
   public async joinSession(codeOrId: string, role: DeviceRole = 'display'): Promise<{ success: boolean; project?: Project; sessionId?: string; code?: string; error?: string }> {
     try {
-      await this.ensureConnected();
-      if (!this.socket) {
-        return { success: false, error: 'Socket not initialized' };
+      const conn = await this.ensureConnected();
+      if (!conn.connected || !this.socket) {
+        return { success: false, error: conn.error || 'Unable to connect to the Duomation realtime server.' };
       }
 
       return await new Promise((resolve) => {

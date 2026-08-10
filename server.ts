@@ -339,7 +339,7 @@ if (process.env.NODE_ENV === 'production') {
   setupViteDev();
 }
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Duet 2D Animation Workstation running on port ${PORT}`);
 });

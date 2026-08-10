@@ -1,8 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
-import { QrCode, Camera, Keyboard, X, Copy, Check, Smartphone, Monitor, AlertTriangle } from 'lucide-react';
+import {
+  QrCode,
+  Camera,
+  X,
+  Copy,
+  Check,
+  AlertTriangle,
+  RefreshCw,
+  Loader2,
+  WifiOff,
+} from 'lucide-react';
 import { getPublicAppUrl } from '../utils/url';
+
+export type QRState = 'waiting-for-session' | 'generating' | 'ready' | 'error';
 
 interface PairingModalProps {
   isOpen: boolean;
@@ -11,6 +23,10 @@ interface PairingModalProps {
   code?: string;
   role: 'draw' | 'display' | 'standalone';
   onJoinSession: (code: string) => void;
+  isCreatingSession?: boolean;
+  sessionError?: string | null;
+  onRetryCreateSession?: () => void;
+  hasDisplayDevice?: boolean;
 }
 
 export const PairingModal: React.FC<PairingModalProps> = ({
@@ -20,8 +36,14 @@ export const PairingModal: React.FC<PairingModalProps> = ({
   code,
   role,
   onJoinSession,
+  isCreatingSession = false,
+  sessionError = null,
+  onRetryCreateSession,
+  hasDisplayDevice = false,
 }) => {
+  const [qrState, setQrState] = useState<QRState>('waiting-for-session');
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [qrError, setQrError] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [scanMode, setScanMode] = useState<boolean>(false);
@@ -31,10 +53,37 @@ export const PairingModal: React.FC<PairingModalProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
 
+  // Generate QR code for Device A
+  const generateQR = async (pairingCode: string) => {
+    setQrState('generating');
+    setQrError(null);
+    try {
+      const publicUrl = getPublicAppUrl();
+      const fullUrl = `${publicUrl}?join=${pairingCode}`;
+      console.info('[Duomation QR] Payload URL =', fullUrl);
+
+      const url = await QRCode.toDataURL(fullUrl, {
+        width: 280,
+        margin: 2,
+        color: { dark: '#000000', light: '#ffffff' },
+      });
+      setQrDataUrl(url);
+      setQrState('ready');
+      setQrError(null);
+    } catch (err: any) {
+      console.error('[Duomation][QR] Failed to generate QR code:', err);
+      setQrDataUrl('');
+      setQrState('error');
+      setQrError('Unable to generate pairing QR code.');
+    }
+  };
+
   // Reset modal state on close/open or code change
   useEffect(() => {
     if (!isOpen) {
       setQrDataUrl('');
+      setQrState('waiting-for-session');
+      setQrError(null);
       setScanMode(false);
       setScanError(null);
       setManualCode('');
@@ -42,17 +91,16 @@ export const PairingModal: React.FC<PairingModalProps> = ({
       return;
     }
 
-    if (role === 'draw' && code) {
-      const publicUrl = getPublicAppUrl();
-      const fullUrl = `${publicUrl}?join=${code}`;
-      QRCode.toDataURL(fullUrl, { width: 280, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
-        .then((url) => setQrDataUrl(url))
-        .catch((err) => {
-          console.error('[Duomation][QR] Generation error:', err);
-          setQrDataUrl('');
-        });
+    if (role === 'draw') {
+      if (code) {
+        generateQR(code);
+      } else if (sessionError) {
+        setQrState('error');
+      } else {
+        setQrState('waiting-for-session');
+      }
     }
-  }, [code, isOpen, role]);
+  }, [code, isOpen, role, sessionError]);
 
   // Handle Camera scanning for Device B (Display Mode only)
   useEffect(() => {
@@ -63,14 +111,17 @@ export const PairingModal: React.FC<PairingModalProps> = ({
     let isStopped = false;
 
     async function startCamera() {
-      // Bug #8: Secure context verification
       if (typeof window !== 'undefined' && !window.isSecureContext) {
-        setScanError('Camera scanning requires a secure HTTPS connection. Please enter the 6-character code manually.');
+        setScanError(
+          'Camera scanning requires a secure HTTPS connection. Please enter the 6-character code manually.'
+        );
         return;
       }
 
       if (!navigator?.mediaDevices?.getUserMedia) {
-        setScanError('Camera access is not supported by your browser. Please enter the code manually.');
+        setScanError(
+          'Camera access is not supported by your browser. Please enter the code manually.'
+        );
         return;
       }
 
@@ -92,10 +143,17 @@ export const PairingModal: React.FC<PairingModalProps> = ({
         }
       } catch (err: any) {
         console.warn('[Duomation][Camera] Error starting camera:', err);
-        if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
-          setScanError('Camera permission was denied. Please allow camera access in browser settings or enter the code manually.');
+        if (
+          err?.name === 'NotAllowedError' ||
+          err?.name === 'PermissionDeniedError'
+        ) {
+          setScanError(
+            'Camera permission was denied. Please allow camera access in browser settings or enter the code manually.'
+          );
         } else {
-          setScanError('Unable to access camera. Please use the 6-character code instead.');
+          setScanError(
+            'Unable to access camera. Please use the 6-character code instead.'
+          );
         }
       }
     }
@@ -105,7 +163,7 @@ export const PairingModal: React.FC<PairingModalProps> = ({
       timerId = setTimeout(() => {
         scanFrame();
         if (!isStopped) scheduleScan();
-      }, 100); // Throttled to ~10 FPS for mobile performance
+      }, 100);
     }
 
     function scanFrame() {
@@ -127,7 +185,6 @@ export const PairingModal: React.FC<PairingModalProps> = ({
           const qrText = codeFound.data.trim();
           let extractedCode: string | null = null;
 
-          // Bug #9 & #10: Parse URL safely
           try {
             if (qrText.startsWith('http://') || qrText.startsWith('https://')) {
               const url = new URL(qrText);
@@ -196,7 +253,7 @@ export const PairingModal: React.FC<PairingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
       <div className="relative w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 p-6 text-slate-100 shadow-2xl">
         <button
           onClick={onClose}
@@ -205,7 +262,7 @@ export const PairingModal: React.FC<PairingModalProps> = ({
           <X className="w-5 h-5" />
         </button>
 
-        <div className="text-center mb-6">
+        <div className="text-center mb-5">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 mb-3">
             <QrCode className="w-6 h-6" />
           </div>
@@ -222,42 +279,103 @@ export const PairingModal: React.FC<PairingModalProps> = ({
         {role === 'draw' ? (
           /* Device A View: Authoritative for DRAW role */
           <div className="space-y-5">
-            <div className="flex flex-col items-center bg-white rounded-xl p-4 shadow-inner">
-              {qrDataUrl ? (
-                <img src={qrDataUrl} alt="Pairing QR Code" className="w-56 h-56" />
-              ) : (
-                <div className="w-56 h-56 flex flex-col items-center justify-center text-slate-500 p-4 text-center">
-                  <span className="text-sm font-medium text-slate-700 mb-1">Pairing Code:</span>
-                  <span className="text-3xl font-mono font-bold text-indigo-600 mb-2">{code || '...'}</span>
-                  <span className="text-xs text-slate-400">Generating QR code image...</span>
+            {/* Case 1: Session creation error */}
+            {sessionError ? (
+              <div className="flex flex-col items-center justify-center bg-rose-500/10 border border-rose-500/20 rounded-xl p-5 text-center space-y-3">
+                <WifiOff className="w-8 h-8 text-rose-400" />
+                <div>
+                  <h3 className="text-sm font-semibold text-rose-200">Pairing Service Unavailable</h3>
+                  <p className="text-xs text-rose-300/80 mt-1">{sessionError}</p>
                 </div>
-              )}
-            </div>
-
-            <div className="text-center">
-              <span className="text-xs uppercase tracking-wider text-slate-400 font-medium">
-                Pair Code for Device B:
-              </span>
-              <div className="mt-1 text-3xl font-mono font-bold tracking-widest text-indigo-400 bg-slate-950/80 py-2.5 px-4 rounded-xl border border-indigo-500/20">
-                {code || 'Generating...'}
+                <p className="text-[11px] text-slate-400">
+                  Please check your internet connection and try reconnecting.
+                </p>
+                {onRetryCreateSession && (
+                  <button
+                    onClick={onRetryCreateSession}
+                    disabled={isCreatingSession}
+                    className="flex items-center gap-2 py-2 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isCreatingSession ? 'animate-spin' : ''}`} />
+                    {isCreatingSession ? 'Connecting...' : 'Retry Connection'}
+                  </button>
+                )}
               </div>
-            </div>
+            ) : isCreatingSession || qrState === 'waiting-for-session' || (!code && !sessionError) ? (
+              /* Case 2: Waiting for session creation */
+              <div className="flex flex-col items-center justify-center bg-slate-950/80 rounded-xl p-8 border border-slate-800/80 text-center space-y-3">
+                <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-200">Creating Secure Pairing Session</h3>
+                  <p className="text-xs text-slate-400 mt-1">Connecting to the Duomation realtime server...</p>
+                </div>
+              </div>
+            ) : qrState === 'error' ? (
+              /* Case 3: QR generation error */
+              <div className="flex flex-col items-center justify-center bg-slate-950/80 rounded-xl p-6 border border-slate-800 text-center space-y-3">
+                <AlertTriangle className="w-8 h-8 text-amber-400" />
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-200">QR Code Error</h3>
+                  <p className="text-xs text-slate-400 mt-1">{qrError || 'Unable to generate pairing QR.'}</p>
+                </div>
+                <div className="w-full bg-slate-900 p-3 rounded-xl border border-slate-800">
+                  <span className="text-xs text-slate-400 block mb-1">Pairing Code:</span>
+                  <span className="text-2xl font-mono font-bold text-indigo-400">{code}</span>
+                </div>
+                {code && (
+                  <button
+                    onClick={() => generateQR(code)}
+                    className="flex items-center gap-2 py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Retry QR Generation
+                  </button>
+                )}
+              </div>
+            ) : (
+              /* Case 4: QR Ready or Code Available */
+              <>
+                <div className="flex flex-col items-center bg-white rounded-xl p-4 shadow-inner">
+                  {qrState === 'generating' ? (
+                    <div className="w-56 h-56 flex flex-col items-center justify-center text-slate-500 p-4 text-center">
+                      <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-2" />
+                      <span className="text-xs text-slate-500 font-medium">Generating QR code...</span>
+                    </div>
+                  ) : qrDataUrl ? (
+                    <img src={qrDataUrl} alt="Pairing QR Code" className="w-56 h-56" />
+                  ) : null}
+                </div>
 
-            <button
-              onClick={handleCopyLink}
-              disabled={!code}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-sm font-medium transition-colors"
-            >
-              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-              {copied ? 'Direct Pairing Link Copied!' : 'Copy Direct Pairing Link'}
-            </button>
+                <div className="text-center">
+                  <span className="text-xs uppercase tracking-wider text-slate-400 font-medium">
+                    Pair Code for Device B:
+                  </span>
+                  <div className="mt-1 text-3xl font-mono font-bold tracking-widest text-indigo-400 bg-slate-950/80 py-2.5 px-4 rounded-xl border border-indigo-500/20">
+                    {code}
+                  </div>
+                </div>
 
-            <div className="text-center py-1">
-              <span className="inline-flex items-center gap-2 text-xs text-slate-400">
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                Waiting for Device B to connect...
-              </span>
-            </div>
+                <button
+                  onClick={handleCopyLink}
+                  disabled={!code}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-sm font-medium transition-colors"
+                >
+                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Direct Pairing Link Copied!' : 'Copy Direct Pairing Link'}
+                </button>
+
+                <div className="text-center py-1">
+                  <span className="inline-flex items-center gap-2 text-xs text-slate-400">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        hasDisplayDevice ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'
+                      }`}
+                    />
+                    {hasDisplayDevice ? 'Device B Connected' : 'Waiting for Device B to connect...'}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           /* Device B View: Authoritative for DISPLAY role or general join */
@@ -332,3 +450,4 @@ export const PairingModal: React.FC<PairingModalProps> = ({
     </div>
   );
 };
+

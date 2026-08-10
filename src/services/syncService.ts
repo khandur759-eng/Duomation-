@@ -1,14 +1,17 @@
 import { io, Socket } from 'socket.io-client';
 import { Project, Stroke, ActiveStrokeData, DeviceRole, SessionState } from '../types/animation';
+import { getSocketUrl } from '../utils/url';
 
 type SyncEventCallback = (event: string, data: any) => void;
 
-const SESSION_STORAGE_KEY = 'duomation_active_session';
+const SESSION_STORAGE_KEY = 'duomation_active_session_v2';
+const MAX_SESSION_AGE_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 interface StoredSessionInfo {
   sessionId: string;
   code: string;
   role: DeviceRole;
+  createdAt: number;
 }
 
 class SyncService {
@@ -28,10 +31,12 @@ class SyncService {
   public init() {
     if (this.socket) return;
 
-    const socketUrl =
-      (import.meta as any).env?.VITE_SOCKET_URL ||
-      (import.meta as any).env?.VITE_APP_URL ||
-      (typeof window !== 'undefined' ? window.location.origin : '');
+    const socketUrl = getSocketUrl();
+    const envName = (import.meta as any).env?.MODE || 'production';
+
+    console.log(`[Duomation Sync] socket URL = ${socketUrl}`);
+    console.log(`[Duomation Sync] environment = ${envName}`);
+    console.log(`[Duomation Sync] transport = websocket/polling`);
 
     this.socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
@@ -41,16 +46,19 @@ class SyncService {
     });
 
     this.socket.on('connect', () => {
+      console.log(`[Duomation Sync] Connected to Socket.IO server: ${this.socket?.id}`);
       this.updateState({ statusText: 'Connected' });
       this.startPingCheck();
 
-      // Attempt auto-rejoin if previous session is saved
+      // Attempt auto-rejoin if previous session is saved and fresh
       const saved = this.getStoredSession();
       if (saved && saved.sessionId && saved.code) {
         this.joinSession(saved.code, saved.role).then((res) => {
           if (res.success) {
+            console.log(`[Duomation Sync] Auto-rejoined session: ${saved.code}`);
             this.notifyListeners('rejoined-session', res);
           } else {
+            console.log(`[Duomation Sync] Failed to auto-rejoin session ${saved.code}: ${res.error}`);
             this.clearStoredSession();
           }
         });
@@ -59,13 +67,14 @@ class SyncService {
       this.notifyListeners('connected', null);
     });
 
-    this.socket.on('disconnect', () => {
-      this.updateState({ active: false, statusText: 'Reconnecting...' });
+    this.socket.on('disconnect', (reason) => {
+      console.warn(`[Duomation Sync] Socket disconnected: ${reason}`);
+      this.updateState({ statusText: 'Reconnecting...' });
       this.notifyListeners('disconnected', null);
     });
 
     this.socket.on('connect_error', (err) => {
-      console.warn('Socket connection error:', err?.message || err);
+      console.warn('[Duomation Sync] Connection error:', err?.message || err);
       this.updateState({ statusText: 'Connection Error (retrying...)' });
       this.notifyListeners('connect_error', err);
     });
@@ -78,13 +87,27 @@ class SyncService {
       this.updateState({ statusText: 'Reconnection Error' });
     });
 
-    this.socket.on('session-status', (data: { connectedDevices: number; hasDisplayDevice: boolean; hasDrawDevice?: boolean }) => {
-      this.updateState({
-        connectedDevices: data.connectedDevices,
-        hasDisplayDevice: data.hasDisplayDevice,
-      });
-      this.notifyListeners('session-status', data);
-    });
+    this.socket.on(
+      'session-status',
+      (data: { connectedDevices: number; hasDisplayDevice: boolean; hasDrawDevice?: boolean; drawConnected?: boolean; displayConnected?: boolean }) => {
+        const hasDisplay = Boolean(data.hasDisplayDevice || data.displayConnected);
+        const hasDraw = Boolean(data.hasDrawDevice || data.drawConnected);
+
+        let statusText = this.state.statusText;
+        if (this.state.role === 'draw') {
+          statusText = hasDisplay ? 'Display Connected' : 'Waiting for Display Device...';
+        } else if (this.state.role === 'display') {
+          statusText = hasDraw ? 'Connected to Drawing Device' : 'Waiting for Drawing Device...';
+        }
+
+        this.updateState({
+          connectedDevices: data.connectedDevices,
+          hasDisplayDevice: hasDisplay,
+          statusText,
+        });
+        this.notifyListeners('session-status', data);
+      }
+    );
 
     this.socket.on('stroke-start', (data: ActiveStrokeData) => {
       this.notifyListeners('stroke-start', data);
@@ -102,9 +125,12 @@ class SyncService {
       this.notifyListeners('select-frame', data);
     });
 
-    this.socket.on('playback-op', (data: { action: 'play' | 'pause' | 'setFps' | 'setFrame'; fps?: number; frameIndex?: number; playing?: boolean; startedAt?: number }) => {
-      this.notifyListeners('playback-op', data);
-    });
+    this.socket.on(
+      'playback-op',
+      (data: { action: 'play' | 'pause' | 'setFps' | 'setFrame'; fps?: number; frameIndex?: number; playing?: boolean; startedAt?: number }) => {
+        this.notifyListeners('playback-op', data);
+      }
+    );
 
     this.socket.on('project-update', (data: { project: Project }) => {
       this.notifyListeners('project-update', data);
@@ -177,16 +203,27 @@ class SyncService {
 
   private setStoredSession(sessionId: string, code: string, role: DeviceRole) {
     try {
-      const data: StoredSessionInfo = { sessionId, code, role };
-      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data));
+      const data: StoredSessionInfo = {
+        sessionId,
+        code,
+        role,
+        createdAt: Date.now(),
+      };
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data));
     } catch (e) {}
   }
 
   private getStoredSession(): StoredSessionInfo | null {
     try {
-      const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      const raw = localStorage.getItem(SESSION_STORAGE_KEY);
       if (!raw) return null;
-      return JSON.parse(raw);
+      const parsed: StoredSessionInfo = JSON.parse(raw);
+      if (!parsed || !parsed.createdAt) return null;
+      if (Date.now() - parsed.createdAt > MAX_SESSION_AGE_MS) {
+        this.clearStoredSession();
+        return null;
+      }
+      return parsed;
     } catch (e) {
       return null;
     }
@@ -194,7 +231,8 @@ class SyncService {
 
   private clearStoredSession() {
     try {
-      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      sessionStorage.removeItem('duomation_active_session');
     } catch (e) {}
   }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Project, DeviceRole, SessionState } from './types/animation';
 import { createNewProject } from './utils/projectDefaults';
 import { loadProject, saveProject } from './utils/db';
@@ -16,6 +16,9 @@ export default function App() {
 
   const [sessionState, setSessionState] = useState<SessionState>(syncService.getState());
   const [isJoinModalOpen, setIsJoinModalOpen] = useState<boolean>(false);
+  const [joinErrorMessage, setJoinErrorMessage] = useState<string | null>(null);
+
+  const hasProcessedJoinRef = useRef<boolean>(false);
 
   useEffect(() => {
     syncService.init();
@@ -26,11 +29,20 @@ export default function App() {
       }
     });
 
-    // Check if opened with ?join=CODE URL query parameter
-    const params = new URLSearchParams(window.location.search);
-    const joinCode = params.get('join');
-    if (joinCode) {
-      handleJoinSessionByCode(joinCode, 'display');
+    // Check if opened with ?join=CODE URL query parameter (Bugs #36, #37, #15)
+    if (!hasProcessedJoinRef.current) {
+      hasProcessedJoinRef.current = true;
+      const params = new URLSearchParams(window.location.search);
+      const joinCode = params.get('join');
+      if (joinCode) {
+        // Clean URL to prevent re-triggering join on manual refresh
+        try {
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
+        } catch (e) {}
+
+        handleJoinSessionByCode(joinCode, 'display');
+      }
     }
 
     return () => {
@@ -81,18 +93,27 @@ export default function App() {
 
   // Action: Join Session by 6-digit Code or QR scan
   const handleJoinSessionByCode = async (code: string, role: DeviceRole = 'display') => {
-    const res = await syncService.joinSession(code, role);
+    setJoinErrorMessage(null);
+    const cleanCode = (code || '').trim().toUpperCase();
+    if (!cleanCode) return;
+
+    const res = await syncService.joinSession(cleanCode, role);
     if (res.success) {
       if (res.project) {
         setCurrentProject(res.project);
       } else {
-        // Fallback default project if waiting for snapshot
+        // Fallback default project while waiting for initial snapshot
         setCurrentProject(createNewProject('Display Session'));
       }
       setIsJoinModalOpen(false);
       setMode('display');
     } else {
-      alert(res.error || 'Failed to join session.');
+      const msg = res.error || 'Pairing session expired or unavailable.';
+      setJoinErrorMessage(msg);
+      // Bug #15: Never force mode = 'draw' when join fails! Keep user in Home or modal with clear message
+      if (!isJoinModalOpen) {
+        alert(msg);
+      }
     }
   };
 
@@ -102,7 +123,10 @@ export default function App() {
         <Home
           onCreateProject={handleCreateNewProject}
           onOpenProject={handleOpenProject}
-          onJoinSession={(role) => setIsJoinModalOpen(true)}
+          onJoinSession={() => {
+            setJoinErrorMessage(null);
+            setIsJoinModalOpen(true);
+          }}
           onImportProject={handleImportProject}
         />
       )}
@@ -127,7 +151,10 @@ export default function App() {
       {/* Join Session Modal for Display device */}
       <PairingModal
         isOpen={isJoinModalOpen}
-        onClose={() => setIsJoinModalOpen(false)}
+        onClose={() => {
+          setIsJoinModalOpen(false);
+          setJoinErrorMessage(null);
+        }}
         role="display"
         onJoinSession={(code) => handleJoinSessionByCode(code, 'display')}
       />

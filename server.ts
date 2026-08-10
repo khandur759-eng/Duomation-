@@ -25,6 +25,15 @@ const io = new Server(httpServer, {
 
 app.use(express.json());
 
+// Health Check Endpoints for production deployment verification
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, status: 'ok', service: 'duomation-realtime', timestamp: Date.now() });
+});
+
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, status: 'ok', service: 'duomation-realtime', timestamp: Date.now() });
+});
+
 // Session memory storage
 interface SessionData {
   id: string;
@@ -67,11 +76,17 @@ function broadcastSessionStatus(sessionId: string) {
 
   const roomSockets = io.sockets.adapter.rooms.get(sessionId);
   const connectedDevices = roomSockets ? roomSockets.size : 0;
+  const hasDisplayDevice = session.displayDeviceIds.length > 0;
+  const hasDrawDevice = Boolean(session.drawDeviceId);
+
+  console.log(`[Duomation][Session] Broadcast ${sessionId}: devices=${connectedDevices}, draw=${hasDrawDevice}, display=${hasDisplayDevice}`);
 
   io.to(sessionId).emit('session-status', {
     connectedDevices,
-    hasDisplayDevice: session.displayDeviceIds.length > 0,
-    hasDrawDevice: Boolean(session.drawDeviceId)
+    hasDisplayDevice,
+    hasDrawDevice,
+    drawConnected: hasDrawDevice,
+    displayConnected: hasDisplayDevice
   });
 }
 

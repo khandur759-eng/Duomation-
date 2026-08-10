@@ -126,6 +126,36 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     }, 1000);
   }, []);
 
+  // Centralized Authoritative Mutation Commit
+  const commitMutation = useCallback(
+    (mutator: (prev: Project) => Project) => {
+      setProject((prev) => {
+        const mutated = mutator(prev);
+        const nextRev = (mutated.revision || 1) + 1;
+        const updatedProject: Project = {
+          ...mutated,
+          revision: nextRev,
+          updatedAt: Date.now(),
+        };
+        syncService.sendProjectUpdate(updatedProject);
+        triggerAutosave(updatedProject);
+        return updatedProject;
+      });
+    },
+    [triggerAutosave]
+  );
+
+  // Subscribe to snapshot requests from Device B
+  useEffect(() => {
+    const unsubscribe = syncService.subscribe((event, data) => {
+      if (event === 'request-sync-snapshot') {
+        const targetSocketId = data?.requestedBy;
+        syncService.sendSyncSnapshot(project, activeFrameIndex, targetSocketId);
+      }
+    });
+    return () => unsubscribe();
+  }, [project, activeFrameIndex]);
+
   // Record undo state before modification
   const pushUndo = useCallback((stateToSave: Project) => {
     setUndoStack((prev) => [...prev.slice(-25), JSON.parse(JSON.stringify(stateToSave))]);
@@ -137,9 +167,11 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     const previous = undoStack[undoStack.length - 1];
     setRedoStack((prev) => [...prev, JSON.parse(JSON.stringify(project))]);
     setUndoStack((prev) => prev.slice(0, prev.length - 1));
-    setProject(previous);
-    syncService.sendProjectUpdate(previous);
-    triggerAutosave(previous);
+    const nextRev = (project.revision || 1) + 1;
+    const restored = { ...previous, revision: nextRev, updatedAt: Date.now() };
+    setProject(restored);
+    syncService.sendProjectUpdate(restored);
+    triggerAutosave(restored);
   };
 
   const handleRedo = () => {
@@ -147,9 +179,11 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     const next = redoStack[redoStack.length - 1];
     setUndoStack((prev) => [...prev, JSON.parse(JSON.stringify(project))]);
     setRedoStack((prev) => prev.slice(0, prev.length - 1));
-    setProject(next);
-    syncService.sendProjectUpdate(next);
-    triggerAutosave(next);
+    const nextRev = (project.revision || 1) + 1;
+    const restored = { ...next, revision: nextRev, updatedAt: Date.now() };
+    setProject(restored);
+    syncService.sendProjectUpdate(restored);
+    triggerAutosave(restored);
   };
 
   // Synchronize canvas rendering
@@ -363,35 +397,44 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
       opacity: toolSettings.opacity,
       points: finalPoints,
       layerId: activeLayerId,
-      frameId: project.frames[activeFrameIndex].id,
+      frameId: project.frames[activeFrameIndex]?.id || 'f1',
       timestamp: Date.now(),
     };
 
-    const key = `${activeLayerId}:${project.frames[activeFrameIndex].id}`;
-    const existingStrokes = project.layerFrames[key] || [];
+    const key = `${activeLayerId}:${project.frames[activeFrameIndex]?.id}`;
+    
+    commitMutation((prev) => {
+      const existingStrokes = prev.layerFrames[key] || [];
+      return {
+        ...prev,
+        layerFrames: {
+          ...prev.layerFrames,
+          [key]: [...existingStrokes, newStroke],
+        },
+      };
+    });
 
-    const updatedProject: Project = {
-      ...project,
-      updatedAt: Date.now(),
-      layerFrames: {
-        ...project.layerFrames,
-        [key]: [...existingStrokes, newStroke],
-      },
-    };
-
-    setProject(updatedProject);
     setCurrentStrokePoints([]);
     currentStrokeIdRef.current = null;
 
-    // Sync commit
+    // Sync stroke end event
     syncService.sendStrokeEnd(newStroke);
-    triggerAutosave(updatedProject);
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (canvasRef.current && canvasRef.current.hasPointerCapture(e.pointerId)) {
+      canvasRef.current.releasePointerCapture(e.pointerId);
+    }
+    setIsDrawing(false);
+    setCurrentStrokePoints([]);
+    currentStrokeIdRef.current = null;
   };
 
   // Timeline Handlers
   const handleSelectFrame = (index: number) => {
-    setActiveFrameIndex(index);
-    syncService.sendSelectFrame(index);
+    const safeIdx = Math.max(0, Math.min(index, project.frames.length - 1));
+    setActiveFrameIndex(safeIdx);
+    syncService.sendSelectFrame(safeIdx);
   };
 
   const handleAddFrame = () => {
@@ -402,52 +445,75 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
       durationMultiplier: 1,
     };
 
-    const updatedFrames = [...project.frames, newFrame];
-    const updatedProject = { ...project, frames: updatedFrames };
+    commitMutation((prev) => ({
+      ...prev,
+      frames: [...prev.frames, newFrame],
+    }));
 
-    setProject(updatedProject);
-    setActiveFrameIndex(updatedFrames.length - 1);
-    syncService.sendProjectUpdate(updatedProject);
-    triggerAutosave(updatedProject);
+    setActiveFrameIndex(project.frames.length);
   };
 
   const handleDuplicateFrame = (index: number) => {
     pushUndo(project);
     const sourceFrame = project.frames[index];
+    if (!sourceFrame) return;
+
     const newFrameId = 'frame_' + Math.random().toString(36).substring(2, 8);
     const newFrame = { ...sourceFrame, id: newFrameId, name: `${sourceFrame.name} Copy` };
 
-    const updatedFrames = [...project.frames];
-    updatedFrames.splice(index + 1, 0, newFrame);
+    commitMutation((prev) => {
+      const updatedFrames = [...prev.frames];
+      updatedFrames.splice(index + 1, 0, newFrame);
 
-    // Copy strokes across layers for this frame
-    const updatedLayerFrames = { ...project.layerFrames };
-    project.layers.forEach((layer) => {
-      const sourceKey = `${layer.id}:${sourceFrame.id}`;
-      const targetKey = `${layer.id}:${newFrameId}`;
-      if (project.layerFrames[sourceKey]) {
-        updatedLayerFrames[targetKey] = JSON.parse(JSON.stringify(project.layerFrames[sourceKey]));
-      }
+      const updatedLayerFrames = { ...prev.layerFrames };
+      prev.layers.forEach((layer) => {
+        const sourceKey = `${layer.id}:${sourceFrame.id}`;
+        const targetKey = `${layer.id}:${newFrameId}`;
+        if (prev.layerFrames[sourceKey]) {
+          // Deep clone strokes and assign new unique stroke IDs to prevent duplicate stroke filtering
+          const sourceStrokes: Stroke[] = JSON.parse(JSON.stringify(prev.layerFrames[sourceKey]));
+          updatedLayerFrames[targetKey] = sourceStrokes.map((st) => ({
+            ...st,
+            id: 'st_dup_' + Math.random().toString(36).substring(2, 9),
+            frameId: newFrameId,
+          }));
+        }
+      });
+
+      return {
+        ...prev,
+        frames: updatedFrames,
+        layerFrames: updatedLayerFrames,
+      };
     });
 
-    const updatedProject = { ...project, frames: updatedFrames, layerFrames: updatedLayerFrames };
-    setProject(updatedProject);
     setActiveFrameIndex(index + 1);
-    syncService.sendProjectUpdate(updatedProject);
-    triggerAutosave(updatedProject);
   };
 
   const handleDeleteFrame = (index: number) => {
     if (project.frames.length <= 1) return;
     pushUndo(project);
 
-    const updatedFrames = project.frames.filter((_, i) => i !== index);
-    const updatedProject = { ...project, frames: updatedFrames };
+    const targetFrame = project.frames[index];
+    if (!targetFrame) return;
 
-    setProject(updatedProject);
+    commitMutation((prev) => {
+      const updatedFrames = prev.frames.filter((_, i) => i !== index);
+      const updatedLayerFrames = { ...prev.layerFrames };
+
+      // Clean up layerFrames associated with deleted frame ID
+      prev.layers.forEach((layer) => {
+        delete updatedLayerFrames[`${layer.id}:${targetFrame.id}`];
+      });
+
+      return {
+        ...prev,
+        frames: updatedFrames,
+        layerFrames: updatedLayerFrames,
+      };
+    });
+
     setActiveFrameIndex(Math.max(0, index - 1));
-    syncService.sendProjectUpdate(updatedProject);
-    triggerAutosave(updatedProject);
   };
 
   // Color selection & recent palette
@@ -747,38 +813,29 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
             locked: false,
             opacity: 1,
           };
-          const updatedProject = {
-            ...project,
-            layers: [...project.layers, newLayer],
-          };
-          setProject(updatedProject);
+          commitMutation((prev) => ({
+            ...prev,
+            layers: [...prev.layers, newLayer],
+          }));
           setActiveLayerId(newLayer.id);
-          syncService.sendProjectUpdate(updatedProject);
-          triggerAutosave(updatedProject);
         }}
         onToggleVisibility={(id) => {
-          const updatedLayers = project.layers.map((l) =>
-            l.id === id ? { ...l, visible: !l.visible } : l
-          );
-          const updatedProject = { ...project, layers: updatedLayers };
-          setProject(updatedProject);
-          triggerAutosave(updatedProject);
+          commitMutation((prev) => ({
+            ...prev,
+            layers: prev.layers.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l)),
+          }));
         }}
         onToggleLock={(id) => {
-          const updatedLayers = project.layers.map((l) =>
-            l.id === id ? { ...l, locked: !l.locked } : l
-          );
-          const updatedProject = { ...project, layers: updatedLayers };
-          setProject(updatedProject);
-          triggerAutosave(updatedProject);
+          commitMutation((prev) => ({
+            ...prev,
+            layers: prev.layers.map((l) => (l.id === id ? { ...l, locked: !l.locked } : l)),
+          }));
         }}
         onChangeOpacity={(id, opacity) => {
-          const updatedLayers = project.layers.map((l) =>
-            l.id === id ? { ...l, opacity } : l
-          );
-          const updatedProject = { ...project, layers: updatedLayers };
-          setProject(updatedProject);
-          triggerAutosave(updatedProject);
+          commitMutation((prev) => ({
+            ...prev,
+            layers: prev.layers.map((l) => (l.id === id ? { ...l, opacity } : l)),
+          }));
         }}
         onReorderLayer={(id, direction) => {
           const index = project.layers.findIndex((l) => l.id === id);
@@ -787,25 +844,29 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
           if (targetIndex < 0 || targetIndex >= project.layers.length) return;
 
           pushUndo(project);
-          const updatedLayers = [...project.layers];
-          const [moved] = updatedLayers.splice(index, 1);
-          updatedLayers.splice(targetIndex, 0, moved);
-
-          const updatedProject = { ...project, layers: updatedLayers };
-          setProject(updatedProject);
-          triggerAutosave(updatedProject);
+          commitMutation((prev) => {
+            const updatedLayers = [...prev.layers];
+            const [moved] = updatedLayers.splice(index, 1);
+            updatedLayers.splice(targetIndex, 0, moved);
+            return {
+              ...prev,
+              layers: updatedLayers,
+            };
+          });
         }}
         onDeleteLayer={(id) => {
           if (project.layers.length <= 1) return;
           pushUndo(project);
 
-          const updatedLayers = project.layers.filter((l) => l.id !== id);
-          const updatedProject = { ...project, layers: updatedLayers };
-          setProject(updatedProject);
+          commitMutation((prev) => ({
+            ...prev,
+            layers: prev.layers.filter((l) => l.id !== id),
+          }));
+
           if (activeLayerId === id) {
-            setActiveLayerId(updatedLayers[0].id);
+            const remaining = project.layers.filter((l) => l.id !== id);
+            if (remaining.length > 0) setActiveLayerId(remaining[0].id);
           }
-          triggerAutosave(updatedProject);
         }}
       />
 

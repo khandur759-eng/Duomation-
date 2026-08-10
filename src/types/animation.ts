@@ -68,6 +68,7 @@ export interface Project {
   id: string;
   name: string;
   version: number;
+  revision: number; // Monotonically increasing revision counter for sync
   createdAt: number;
   updatedAt: number;
   settings: CanvasSettings;

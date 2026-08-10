@@ -3,6 +3,14 @@ import { Project, Stroke, ActiveStrokeData, DeviceRole, SessionState } from '../
 
 type SyncEventCallback = (event: string, data: any) => void;
 
+const SESSION_STORAGE_KEY = 'duomation_active_session';
+
+interface StoredSessionInfo {
+  sessionId: string;
+  code: string;
+  role: DeviceRole;
+}
+
 class SyncService {
   private socket: Socket | null = null;
   private listeners: Set<SyncEventCallback> = new Set();
@@ -28,6 +36,19 @@ class SyncService {
     this.socket.on('connect', () => {
       this.updateState({ statusText: 'Connected' });
       this.startPingCheck();
+
+      // Attempt auto-rejoin if previous session is saved
+      const saved = this.getStoredSession();
+      if (saved && saved.sessionId && saved.code) {
+        this.joinSession(saved.code, saved.role).then((res) => {
+          if (res.success) {
+            this.notifyListeners('rejoined-session', res);
+          } else {
+            this.clearStoredSession();
+          }
+        });
+      }
+
       this.notifyListeners('connected', null);
     });
 
@@ -36,7 +57,7 @@ class SyncService {
       this.notifyListeners('disconnected', null);
     });
 
-    this.socket.on('session-status', (data: { connectedDevices: number; hasDisplayDevice: boolean }) => {
+    this.socket.on('session-status', (data: { connectedDevices: number; hasDisplayDevice: boolean; hasDrawDevice?: boolean }) => {
       this.updateState({
         connectedDevices: data.connectedDevices,
         hasDisplayDevice: data.hasDisplayDevice,
@@ -60,7 +81,7 @@ class SyncService {
       this.notifyListeners('select-frame', data);
     });
 
-    this.socket.on('playback-op', (data: { action: 'play' | 'pause' | 'setFps' | 'setFrame'; fps?: number; frameIndex?: number }) => {
+    this.socket.on('playback-op', (data: { action: 'play' | 'pause' | 'setFps' | 'setFrame'; fps?: number; frameIndex?: number; playing?: boolean; startedAt?: number }) => {
       this.notifyListeners('playback-op', data);
     });
 
@@ -86,7 +107,13 @@ class SyncService {
   }
 
   private notifyListeners(event: string, data: any) {
-    this.listeners.forEach((fn) => fn(event, data));
+    this.listeners.forEach((fn) => {
+      try {
+        fn(event, data);
+      } catch (e) {
+        console.error('Error in sync listener:', e);
+      }
+    });
   }
 
   private updateState(partial: Partial<SessionState>) {
@@ -98,11 +125,35 @@ class SyncService {
     return this.state;
   }
 
+  private setStoredSession(sessionId: string, code: string, role: DeviceRole) {
+    try {
+      const data: StoredSessionInfo = { sessionId, code, role };
+      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {}
+  }
+
+  private getStoredSession(): StoredSessionInfo | null {
+    try {
+      const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  private clearStoredSession() {
+    try {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    } catch (e) {}
+  }
+
   public createSession(project: Project): Promise<{ success: boolean; sessionId?: string; code?: string; error?: string }> {
     return new Promise((resolve) => {
       if (!this.socket) this.init();
       this.socket?.emit('create-session', { project }, (res: any) => {
         if (res && res.success) {
+          this.setStoredSession(res.sessionId, res.code, 'draw');
           this.updateState({
             active: true,
             sessionId: res.sessionId,
@@ -124,6 +175,7 @@ class SyncService {
       if (!this.socket) this.init();
       this.socket?.emit('join-session', { sessionKey: codeOrId, role }, (res: any) => {
         if (res && res.success) {
+          this.setStoredSession(res.sessionId, res.code, role);
           this.updateState({
             active: true,
             sessionId: res.sessionId,
@@ -139,6 +191,7 @@ class SyncService {
             code: res.code,
           });
         } else {
+          this.clearStoredSession();
           resolve({ success: false, error: res?.error || 'Invalid session code or room expired.' });
         }
       });
@@ -171,7 +224,7 @@ class SyncService {
     }
   }
 
-  public sendPlaybackOp(data: { action: 'play' | 'pause' | 'setFps' | 'setFrame'; fps?: number; frameIndex?: number }) {
+  public sendPlaybackOp(data: { action: 'play' | 'pause' | 'setFps' | 'setFrame'; fps?: number; frameIndex?: number; playing?: boolean; startedAt?: number }) {
     if (this.state.active) {
       this.socket?.emit('playback-op', data);
     }
@@ -202,6 +255,10 @@ class SyncService {
   }
 
   public disconnectSession() {
+    if (this.socket && this.state.active) {
+      this.socket.emit('leave-session');
+    }
+    this.clearStoredSession();
     this.updateState({
       active: false,
       sessionId: undefined,
@@ -213,3 +270,4 @@ class SyncService {
 }
 
 export const syncService = new SyncService();
+

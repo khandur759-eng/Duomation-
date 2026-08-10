@@ -36,6 +36,7 @@ export function createNewProject(name = 'Untitled Animation'): Project {
     id: 'proj_' + Math.random().toString(36).substring(2, 9),
     name,
     version: 1,
+    revision: 1,
     createdAt: Date.now(),
     updatedAt: Date.now(),
     settings: defaultSettings,

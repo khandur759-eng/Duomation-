@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Project } from '../types/animation';
 import { listAllProjects, deleteProject } from '../utils/db';
-import { Plus, Monitor, Smartphone, FolderOpen, Trash2, Upload, Sparkles } from 'lucide-react';
+import { checkSupabaseConnection, SUPABASE_PROJECT_ID } from '../lib/supabase';
+import { Plus, Monitor, Smartphone, FolderOpen, Trash2, Upload, Sparkles, Database, CheckCircle2 } from 'lucide-react';
 
 interface HomeProps {
   onCreateProject: () => void;
@@ -17,6 +18,7 @@ export const Home: React.FC<HomeProps> = ({
   onImportProject,
 }) => {
   const [recentProjects, setRecentProjects] = useState<Array<{ id: string; name: string; updatedAt: number; frameCount: number }>>([]);
+  const [dbStatus, setDbStatus] = useState<{ connected: boolean; message: string }>({ connected: true, message: 'Supabase Active' });
 
   const reloadProjects = async () => {
     const list = await listAllProjects();
@@ -25,7 +27,9 @@ export const Home: React.FC<HomeProps> = ({
 
   useEffect(() => {
     reloadProjects();
+    checkSupabaseConnection().then(setDbStatus);
   }, []);
+
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -59,7 +63,7 @@ export const Home: React.FC<HomeProps> = ({
     <div className="min-h-screen w-full bg-slate-950 text-slate-100 flex flex-col justify-between p-6 md:p-12 selection:bg-indigo-500 selection:text-white">
       <div className="max-w-4xl mx-auto w-full space-y-12">
         {/* Header */}
-        <header className="flex items-center justify-between">
+        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center font-black text-white text-xl shadow-lg shadow-indigo-500/20">
               D
@@ -70,11 +74,19 @@ export const Home: React.FC<HomeProps> = ({
             </div>
           </div>
 
-          <label className="cursor-pointer flex items-center gap-2 py-2 px-3.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 text-xs font-medium transition-colors">
-            <Upload className="w-4 h-4 text-slate-400" />
-            <span>Import JSON</span>
-            <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
-          </label>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono" title={`Supabase Project ID: ${SUPABASE_PROJECT_ID}`}>
+              <Database className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Supabase Cloud Sync</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            </div>
+
+            <label className="cursor-pointer flex items-center gap-2 py-2 px-3.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 text-xs font-medium transition-colors">
+              <Upload className="w-4 h-4 text-slate-400" />
+              <span>Import JSON</span>
+              <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
+            </label>
+          </div>
         </header>
 
         {/* Hero & Dual Primary Actions */}

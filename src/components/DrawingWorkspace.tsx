@@ -263,7 +263,21 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   useEffect(() => {
     updateCanvasBounds();
     window.addEventListener('resize', updateCanvasBounds);
-    return () => window.removeEventListener('resize', updateCanvasBounds);
+    window.addEventListener('orientationchange', updateCanvasBounds);
+
+    let ro: ResizeObserver | null = null;
+    if (containerRef.current && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => {
+        updateCanvasBounds();
+      });
+      ro.observe(containerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateCanvasBounds);
+      window.removeEventListener('orientationchange', updateCanvasBounds);
+      if (ro) ro.disconnect();
+    };
   }, [updateCanvasBounds]);
 
   useEffect(() => {
@@ -407,8 +421,20 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
 
     if (currentStrokePoints.length === 0) return;
 
-    // Simplify completed stroke
-    const finalPoints = simplifyPoints(currentStrokePoints, 0.0003);
+    // Simplify completed stroke or lock shape points
+    let finalPoints: Point[] = [];
+    if (
+      toolSettings.activeTool === 'line' ||
+      toolSettings.activeTool === 'rectangle' ||
+      toolSettings.activeTool === 'ellipse'
+    ) {
+      finalPoints = [
+        currentStrokePoints[0],
+        currentStrokePoints[currentStrokePoints.length - 1],
+      ];
+    } else {
+      finalPoints = simplifyPoints(currentStrokePoints, 0.0003);
+    }
 
     const newStroke: Stroke = {
       id: currentStrokeIdRef.current || 'st_' + Date.now(),
@@ -548,7 +574,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   return (
     <div className="relative w-screen h-screen bg-slate-950 text-slate-100 flex flex-col justify-between overflow-hidden select-none">
       {/* Top Header Bar */}
-      <header className="h-14 px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between z-20">
+      <header className="h-11 sm:h-14 px-2.5 sm:px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between z-20">
         {/* Left: Home & Title */}
         <div className="flex items-center gap-3">
           <button
@@ -802,7 +828,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
         </aside>
 
         {/* Dedicated Interactive Animation Canvas */}
-        <div ref={containerRef} className="w-full h-full flex items-center justify-center p-4">
+        <div ref={containerRef} className="w-full h-full flex items-center justify-center p-1.5 sm:p-3 landscape:p-1">
           <canvas
             ref={canvasRef}
             onPointerDown={handlePointerDown}

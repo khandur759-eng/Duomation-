@@ -57,7 +57,7 @@ export function drawStroke(
   }
 
   // Geometric shapes
-  if (stroke.tool === 'line' && pts.length >= 2) {
+  if (stroke.tool === 'line' && pts.length >= 1) {
     const p1 = pts[0];
     const p2 = pts[pts.length - 1];
     ctx.lineWidth = baseWidth;
@@ -69,7 +69,7 @@ export function drawStroke(
     return;
   }
 
-  if (stroke.tool === 'rectangle' && pts.length >= 2) {
+  if (stroke.tool === 'rectangle' && pts.length >= 1) {
     const p1 = pts[0];
     const p2 = pts[pts.length - 1];
     const x = Math.min(p1.x, p2.x) * canvasWidth;
@@ -83,7 +83,7 @@ export function drawStroke(
     return;
   }
 
-  if (stroke.tool === 'ellipse' && pts.length >= 2) {
+  if (stroke.tool === 'ellipse' && pts.length >= 1) {
     const p1 = pts[0];
     const p2 = pts[pts.length - 1];
     const cx = ((p1.x + p2.x) / 2) * canvasWidth;
@@ -104,16 +104,16 @@ export function drawStroke(
     return;
   }
 
-  // Handle Marker / Highlighter tool
+  // Handle Marker / Highlighter tool (Translucent Broad Marker)
   if (stroke.tool === 'marker') {
-    ctx.globalAlpha *= 0.5;
+    ctx.globalAlpha = Math.min(strokeOpacity, 0.4);
     ctx.lineCap = 'square';
     ctx.lineJoin = 'miter';
-    ctx.lineWidth = baseWidth * 1.5;
-    
+    ctx.lineWidth = baseWidth * 2.2;
+
     if (pts.length === 1) {
       const p = pts[0];
-      ctx.fillRect(p.x * canvasWidth - baseWidth / 2, p.y * canvasHeight - baseWidth / 2, baseWidth, baseWidth);
+      ctx.fillRect(p.x * canvasWidth - baseWidth, p.y * canvasHeight - baseWidth, baseWidth * 2, baseWidth * 2);
     } else {
       ctx.beginPath();
       ctx.moveTo(pts[0].x * canvasWidth, pts[0].y * canvasHeight);
@@ -128,14 +128,16 @@ export function drawStroke(
 
   // Handle Spray / Airbrush Particle tool
   if (stroke.tool === 'spray') {
-    const density = Math.max(12, Math.floor(baseWidth * 1.2));
-    const radius = baseWidth * 1.2;
+    const radius = baseWidth * 1.5;
+    const density = Math.max(14, Math.floor(baseWidth * 2.2));
+
     for (let i = 0; i < pts.length; i++) {
       const px = pts[i].x * canvasWidth;
       const py = pts[i].y * canvasHeight;
-      const pCount = (pts[i].pressure !== undefined ? pts[i].pressure : 0.5) * density;
-      
-      // Seeded random per point to ensure deterministic rendering
+      const pressure = pts[i].pressure !== undefined ? pts[i].pressure : 0.5;
+      const pCount = Math.floor(density * (0.4 + pressure * 0.9));
+
+      // Seeded PRNG for stable rendering
       let seed = (i * 9301 + 49297) % 233280;
       const rnd = () => {
         seed = (seed * 9301 + 49297) % 233280;
@@ -159,13 +161,13 @@ export function drawStroke(
 
   // Handle Chalk / Charcoal tool
   if (stroke.tool === 'chalk') {
-    ctx.globalAlpha *= 0.75;
+    ctx.globalAlpha = strokeOpacity * 0.8;
     for (let i = 0; i < pts.length; i++) {
       const px = pts[i].x * canvasWidth;
       const py = pts[i].y * canvasHeight;
       const pressure = pts[i].pressure !== undefined ? pts[i].pressure : 0.5;
-      const passCount = Math.max(2, Math.floor(baseWidth * 0.4));
-      
+      const passCount = Math.max(3, Math.floor(baseWidth * 0.5));
+
       let seed = (i * 49297 + 9301) % 233280;
       const rnd = () => {
         seed = (seed * 9301 + 49297) % 233280;
@@ -173,9 +175,9 @@ export function drawStroke(
       };
 
       for (let k = 0; k < passCount; k++) {
-        const offsetX = (rnd() - 0.5) * baseWidth * 0.8;
-        const offsetY = (rnd() - 0.5) * baseWidth * 0.8;
-        const dotSize = Math.max(1, (baseWidth * 0.25) * (0.5 + pressure * 0.8));
+        const offsetX = (rnd() - 0.5) * baseWidth * 0.9;
+        const offsetY = (rnd() - 0.5) * baseWidth * 0.9;
+        const dotSize = Math.max(1, (baseWidth * 0.3) * (0.4 + pressure * 0.8));
         ctx.fillRect(px + offsetX, py + offsetY, dotSize, dotSize);
       }
 
@@ -184,8 +186,8 @@ export function drawStroke(
         const prevPy = pts[i - 1].y * canvasHeight;
         ctx.lineWidth = Math.max(1, baseWidth * 0.6);
         ctx.beginPath();
-        ctx.moveTo(prevPx + (rnd() - 0.5) * 2, prevPy + (rnd() - 0.5) * 2);
-        ctx.lineTo(px + (rnd() - 0.5) * 2, py + (rnd() - 0.5) * 2);
+        ctx.moveTo(prevPx + (rnd() - 0.5) * 3, prevPy + (rnd() - 0.5) * 3);
+        ctx.lineTo(px + (rnd() - 0.5) * 3, py + (rnd() - 0.5) * 3);
         ctx.stroke();
       }
     }
@@ -196,7 +198,7 @@ export function drawStroke(
   // Handle Calligraphy Chisel tool
   if (stroke.tool === 'calligraphy') {
     const nibAngle = Math.PI / 4; // 45 degree angle nib
-    const nibLen = baseWidth * 1.2;
+    const nibLen = baseWidth * 1.4;
     const dx = Math.cos(nibAngle) * (nibLen / 2);
     const dy = Math.sin(nibAngle) * (nibLen / 2);
 
@@ -226,29 +228,108 @@ export function drawStroke(
     return;
   }
 
+  // Handle Soft Airbrush (Gaussian radial falloff)
   if (stroke.tool === 'soft') {
-    // Soft airbrush rendering
+    const radius = Math.max(3, baseWidth * 1.5);
+    // Parse hex color to RGB for radial gradient
+    const hex = stroke.color.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16) || 0;
+    const g = parseInt(hex.substring(2, 4), 16) || 0;
+    const b = parseInt(hex.substring(4, 6), 16) || 0;
+
+    for (let i = 0; i < pts.length; i++) {
+      const px = pts[i].x * canvasWidth;
+      const py = pts[i].y * canvasHeight;
+      const grad = ctx.createRadialGradient(px, py, 0, px, py, radius);
+      grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${strokeOpacity * 0.35})`);
+      grad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, ${strokeOpacity * 0.15})`);
+      grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(px, py, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+
+  // Handle Paint Brush (Painterly Soft Stroke)
+  if (stroke.tool === 'brush') {
+    ctx.globalAlpha = strokeOpacity * 0.6;
     ctx.shadowColor = stroke.color;
-    ctx.shadowBlur = baseWidth * 1.5;
+    ctx.shadowBlur = baseWidth * 0.25;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (pts.length === 1) {
+      const p = pts[0];
+      const pressure = p.pressure !== undefined ? p.pressure : 0.5;
+      const r = baseWidth * (0.4 + pressure * 0.8);
+      ctx.beginPath();
+      ctx.arc(p.x * canvasWidth, p.y * canvasHeight, Math.max(1, r / 2), 0, 2 * Math.PI);
+      ctx.fill();
+    } else {
+      for (let i = 1; i < pts.length; i++) {
+        const prev = pts[i - 1];
+        const curr = pts[i];
+        const pressure = curr.pressure !== undefined ? curr.pressure : 0.5;
+        const segWidth = Math.max(1, baseWidth * (0.4 + pressure * 0.8));
+
+        ctx.lineWidth = segWidth;
+        ctx.beginPath();
+        ctx.moveTo(prev.x * canvasWidth, prev.y * canvasHeight);
+        ctx.lineTo(curr.x * canvasWidth, curr.y * canvasHeight);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    return;
   }
 
+  // Handle Pencil (Fine Sketch Stroke)
   if (stroke.tool === 'pencil') {
-    // Pencil slightly textured feel
-    ctx.globalAlpha *= 0.85;
-    ctx.lineWidth = Math.max(1, baseWidth * 0.7);
-  } else {
-    ctx.lineWidth = baseWidth;
+    ctx.globalAlpha = strokeOpacity * 0.88;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (pts.length === 1) {
+      const p = pts[0];
+      const pressure = p.pressure !== undefined ? p.pressure : 0.5;
+      const r = baseWidth * 0.55 * (0.4 + pressure * 0.7);
+      ctx.beginPath();
+      ctx.arc(p.x * canvasWidth, p.y * canvasHeight, Math.max(1, r / 2), 0, 2 * Math.PI);
+      ctx.fill();
+    } else {
+      for (let i = 1; i < pts.length; i++) {
+        const prev = pts[i - 1];
+        const curr = pts[i];
+        const pressure = curr.pressure !== undefined ? curr.pressure : 0.5;
+        const segWidth = Math.max(1, baseWidth * 0.55 * (0.4 + pressure * 0.7));
+
+        ctx.lineWidth = segWidth;
+        ctx.beginPath();
+        ctx.moveTo(prev.x * canvasWidth, prev.y * canvasHeight);
+        ctx.lineTo(curr.x * canvasWidth, curr.y * canvasHeight);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    return;
   }
 
-  // Freehand path drawing with pressure support
+  // Default / Ink Pen (Clean Line Art)
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
   if (pts.length === 1) {
     const p = pts[0];
-    const r = (p.pressure !== undefined ? p.pressure : 0.5) * baseWidth;
+    const pressure = p.pressure !== undefined ? p.pressure : 0.5;
+    const r = baseWidth * (0.3 + pressure * 0.9);
     ctx.beginPath();
     ctx.arc(p.x * canvasWidth, p.y * canvasHeight, Math.max(1, r / 2), 0, 2 * Math.PI);
     ctx.fill();
   } else {
-    // Pressure sensitive variable stroke segments
     for (let i = 1; i < pts.length; i++) {
       const prev = pts[i - 1];
       const curr = pts[i];
@@ -267,7 +348,7 @@ export function drawStroke(
 }
 
 /**
- * Flood fill implementation for enclosed regions
+ * Fast scanline flood fill implementation for enclosed regions
  */
 export function floodFill(
   ctx: CanvasRenderingContext2D,
@@ -277,59 +358,118 @@ export function floodFill(
   canvasWidth: number,
   canvasHeight: number
 ) {
+  const ix = Math.floor(startX);
+  const iy = Math.floor(startY);
+  if (ix < 0 || ix >= canvasWidth || iy < 0 || iy >= canvasHeight) return;
+
   const imgData = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
   const data = imgData.data;
 
-  // Convert hex to RGBA
-  const tempCanvas = document.createElement('canvas');
-  const tempCtx = tempCanvas.getContext('2d');
-  if (!tempCtx) return;
-  tempCtx.fillStyle = fillColorHex;
-  tempCtx.fillRect(0, 0, 1, 1);
-  const fillRgb = tempCtx.getImageData(0, 0, 1, 1).data;
+  // Convert hex color to RGBA
+  const hex = fillColorHex.replace('#', '');
+  const fillR = parseInt(hex.substring(0, 2), 16) || 0;
+  const fillG = parseInt(hex.substring(2, 4), 16) || 0;
+  const fillB = parseInt(hex.substring(4, 6), 16) || 0;
+  const fillA = 255;
 
-  const targetIdx = (Math.floor(startY) * canvasWidth + Math.floor(startX)) * 4;
-  const startR = data[targetIdx];
-  const startG = data[targetIdx + 1];
-  const startB = data[targetIdx + 2];
-  const startA = data[targetIdx + 3];
+  const startIdx = (iy * canvasWidth + ix) * 4;
+  const startR = data[startIdx];
+  const startG = data[startIdx + 1];
+  const startB = data[startIdx + 2];
+  const startA = data[startIdx + 3];
 
   if (
-    startR === fillRgb[0] &&
-    startG === fillRgb[1] &&
-    startB === fillRgb[2] &&
-    startA === fillRgb[3]
+    Math.abs(startR - fillR) <= 3 &&
+    Math.abs(startG - fillG) <= 3 &&
+    Math.abs(startB - fillB) <= 3 &&
+    Math.abs(startA - fillA) <= 3
   ) {
-    return; // Already filled
+    return; // Target region is already the fill color
   }
 
-  const queue: [number, number][] = [[Math.floor(startX), Math.floor(startY)]];
+  const tolerance = 45; // Anti-aliasing tolerance
   const visited = new Uint8Array(canvasWidth * canvasHeight);
+  const stack: [number, number][] = [[ix, iy]];
 
-  while (queue.length > 0) {
-    const [x, y] = queue.pop()!;
-    if (x < 0 || x >= canvasWidth || y < 0 || y >= canvasHeight) continue;
+  while (stack.length > 0) {
+    const [x, y] = stack.pop()!;
+    let currentY = y;
 
-    const idx = y * canvasWidth + x;
-    if (visited[idx]) continue;
-    visited[idx] = 1;
+    while (currentY >= 0) {
+      const idx = currentY * canvasWidth + x;
+      if (visited[idx]) break;
+      const pIdx = idx * 4;
+      const diff =
+        Math.abs(data[pIdx] - startR) +
+        Math.abs(data[pIdx + 1] - startG) +
+        Math.abs(data[pIdx + 2] - startB) +
+        Math.abs(data[pIdx + 3] - startA);
+      if (diff > tolerance) break;
+      currentY--;
+    }
+    currentY++;
 
-    const pIdx = idx * 4;
-    if (
-      Math.abs(data[pIdx] - startR) <= 30 &&
-      Math.abs(data[pIdx + 1] - startG) <= 30 &&
-      Math.abs(data[pIdx + 2] - startB) <= 30 &&
-      Math.abs(data[pIdx + 3] - startA) <= 30
-    ) {
-      data[pIdx] = fillRgb[0];
-      data[pIdx + 1] = fillRgb[1];
-      data[pIdx + 2] = fillRgb[2];
-      data[pIdx + 3] = 255;
+    let reachLeft = false;
+    let reachRight = false;
 
-      queue.push([x + 1, y]);
-      queue.push([x - 1, y]);
-      queue.push([x, y + 1]);
-      queue.push([x, y - 1]);
+    while (currentY < canvasHeight) {
+      const idx = currentY * canvasWidth + x;
+      if (visited[idx]) break;
+      const pIdx = idx * 4;
+      const diff =
+        Math.abs(data[pIdx] - startR) +
+        Math.abs(data[pIdx + 1] - startG) +
+        Math.abs(data[pIdx + 2] - startB) +
+        Math.abs(data[pIdx + 3] - startA);
+      if (diff > tolerance) break;
+
+      visited[idx] = 1;
+      data[pIdx] = fillR;
+      data[pIdx + 1] = fillG;
+      data[pIdx + 2] = fillB;
+      data[pIdx + 3] = fillA;
+
+      if (x > 0) {
+        const lIdx = currentY * canvasWidth + (x - 1);
+        if (!visited[lIdx]) {
+          const lpIdx = lIdx * 4;
+          const lDiff =
+            Math.abs(data[lpIdx] - startR) +
+            Math.abs(data[lpIdx + 1] - startG) +
+            Math.abs(data[lpIdx + 2] - startB) +
+            Math.abs(data[lpIdx + 3] - startA);
+          if (lDiff <= tolerance) {
+            if (!reachLeft) {
+              stack.push([x - 1, currentY]);
+              reachLeft = true;
+            }
+          } else {
+            reachLeft = false;
+          }
+        }
+      }
+
+      if (x < canvasWidth - 1) {
+        const rIdx = currentY * canvasWidth + (x + 1);
+        if (!visited[rIdx]) {
+          const rpIdx = rIdx * 4;
+          const rDiff =
+            Math.abs(data[rpIdx] - startR) +
+            Math.abs(data[rpIdx + 1] - startG) +
+            Math.abs(data[rpIdx + 2] - startB) +
+            Math.abs(data[rpIdx + 3] - startA);
+          if (rDiff <= tolerance) {
+            if (!reachRight) {
+              stack.push([x + 1, currentY]);
+              reachRight = true;
+            }
+          } else {
+            reachRight = false;
+          }
+        }
+      }
+
+      currentY++;
     }
   }
 

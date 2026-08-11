@@ -187,7 +187,21 @@ export const DisplayWorkspace: React.FC<DisplayWorkspaceProps> = ({
   useEffect(() => {
     updateCanvasSize();
     window.addEventListener('resize', updateCanvasSize);
-    return () => window.removeEventListener('resize', updateCanvasSize);
+    window.addEventListener('orientationchange', updateCanvasSize);
+
+    let ro: ResizeObserver | null = null;
+    if (containerRef.current && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => {
+        updateCanvasSize();
+      });
+      ro.observe(containerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateCanvasSize);
+      window.removeEventListener('orientationchange', updateCanvasSize);
+      if (ro) ro.disconnect();
+    };
   }, [updateCanvasSize]);
 
   useEffect(() => {

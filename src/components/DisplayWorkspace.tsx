@@ -161,11 +161,28 @@ export const DisplayWorkspace: React.FC<DisplayWorkspaceProps> = ({
     const rect = container.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
 
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    const targetAspect = (project.settings?.width || 1920) / (project.settings?.height || 1080);
+    const containerAspect = rect.width / rect.height;
+
+    let displayWidth = rect.width;
+    let displayHeight = rect.height;
+
+    if (containerAspect > targetAspect) {
+      displayHeight = rect.height;
+      displayWidth = rect.height * targetAspect;
+    } else {
+      displayWidth = rect.width;
+      displayHeight = rect.width / targetAspect;
+    }
+
+    canvas.style.width = `${displayWidth}px`;
+    canvas.style.height = `${displayHeight}px`;
+
+    canvas.width = Math.round(displayWidth * dpr);
+    canvas.height = Math.round(displayHeight * dpr);
 
     renderPass();
-  }, [renderPass]);
+  }, [project.settings?.width, project.settings?.height, renderPass]);
 
   useEffect(() => {
     updateCanvasSize();

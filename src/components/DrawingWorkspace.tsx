@@ -45,6 +45,9 @@ import {
   Pipette,
   Palette,
   Flame,
+  X,
+  ChevronRight,
+  Wrench,
 } from 'lucide-react';
 
 interface DrawingWorkspaceProps {
@@ -84,6 +87,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState<boolean>(false);
   const [isOnionSettingsOpen, setIsOnionSettingsOpen] = useState<boolean>(false);
   const [isColorPickerOpen, setIsColorPickerOpen] = useState<boolean>(false);
+  const [isMobileToolsOpen, setIsMobileToolsOpen] = useState<boolean>(false);
 
   const [savedPalette, setSavedPalette] = useState<string[]>(() => {
     try {
@@ -234,10 +238,27 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     const rect = container.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
 
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    const targetAspect = (project.settings?.width || 1920) / (project.settings?.height || 1080);
+    const containerAspect = rect.width / rect.height;
+
+    let displayWidth = rect.width;
+    let displayHeight = rect.height;
+
+    if (containerAspect > targetAspect) {
+      displayHeight = rect.height;
+      displayWidth = rect.height * targetAspect;
+    } else {
+      displayWidth = rect.width;
+      displayHeight = rect.width / targetAspect;
+    }
+
+    canvas.style.width = `${displayWidth}px`;
+    canvas.style.height = `${displayHeight}px`;
+
+    canvas.width = Math.round(displayWidth * dpr);
+    canvas.height = Math.round(displayHeight * dpr);
     renderPass();
-  }, [renderPass]);
+  }, [project.settings?.width, project.settings?.height, renderPass]);
 
   useEffect(() => {
     updateCanvasBounds();
@@ -611,8 +632,8 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
 
       {/* Main Workspace Area */}
       <div className="relative flex-1 w-full bg-slate-950 flex items-center justify-center overflow-hidden">
-        {/* Docked Left Toolbar */}
-        <aside className="absolute top-4 left-4 z-20 flex flex-col items-center gap-1.5 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md p-2 rounded-2xl shadow-2xl max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
+        {/* Desktop Docked Left Toolbar */}
+        <aside className="hidden md:flex absolute top-4 left-4 z-20 flex-col items-center gap-1.5 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md p-2 rounded-2xl shadow-2xl max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
           {[
             { id: 'pencil', label: 'Pencil (Fine Sketch)', icon: Pencil },
             { id: 'ink', label: 'Ink Pen (Clean Lines)', icon: PenTool },
@@ -656,20 +677,53 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
           })}
         </aside>
 
+        {/* Mobile Compact Tool Selector Pill */}
+        <div className="flex md:hidden absolute top-3 left-3 z-20 items-center gap-1.5 bg-slate-900/95 border border-slate-800 backdrop-blur-md p-1.5 pl-2.5 rounded-xl shadow-xl">
+          <button
+            onClick={() => setIsMobileToolsOpen(true)}
+            className="flex items-center gap-2 text-xs font-semibold text-slate-200 active:scale-95 transition-transform"
+          >
+            <span className="p-1.5 rounded-lg bg-indigo-600 text-white shadow">
+              {(() => {
+                const tools: Record<string, React.FC<{ className?: string }>> = {
+                  pencil: Pencil,
+                  ink: PenTool,
+                  brush: Paintbrush,
+                  marker: Highlighter,
+                  spray: Sparkles,
+                  chalk: Flame,
+                  calligraphy: Feather,
+                  soft: Circle,
+                  eraser: Eraser,
+                  fill: PaintBucket,
+                  eyedropper: Pipette,
+                  line: Minus,
+                  rectangle: Square,
+                  ellipse: Circle,
+                };
+                const ActiveIcon = tools[toolSettings.activeTool] || Pencil;
+                return <ActiveIcon className="w-4 h-4" />;
+              })()}
+            </span>
+            <span className="capitalize font-medium text-slate-300">{toolSettings.activeTool}</span>
+            <Wrench className="w-3.5 h-3.5 text-indigo-400 ml-0.5" />
+          </button>
+        </div>
+
         {/* Floating Tool Customizer (Color, Size, Opacity, Stabilizer) */}
-        <aside className="absolute top-4 right-4 z-20 flex items-center gap-3 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md px-3 py-2 rounded-2xl shadow-2xl text-xs">
+        <aside className="absolute top-3 right-3 md:top-4 md:right-4 z-20 flex items-center gap-2.5 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md px-2.5 py-1.5 md:px-3 md:py-2 rounded-2xl shadow-2xl text-xs">
           {/* Color Palette Button */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsColorPickerOpen(true)}
-              className="flex items-center gap-2 p-1.5 pr-2.5 rounded-xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700/80 transition-all active:scale-95 group"
+              className="flex items-center gap-2 p-1 pr-2 sm:p-1.5 sm:pr-2.5 rounded-xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700/80 transition-all active:scale-95 group"
               title="Open Color Palette & Picker"
             >
               <div
-                className="w-6 h-6 rounded-lg border border-slate-600 shadow-inner flex items-center justify-center transition-transform group-hover:scale-105"
+                className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg border border-slate-600 shadow-inner flex items-center justify-center transition-transform group-hover:scale-105"
                 style={{ backgroundColor: toolSettings.color }}
               />
-              <Palette className="w-4 h-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+              <Palette className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
               <span className="hidden lg:inline text-[11px] font-mono text-slate-300 uppercase">{toolSettings.color}</span>
             </button>
 
@@ -694,15 +748,15 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
           <div className="h-4 w-px bg-slate-800" />
 
           {/* Size Slider */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-slate-400">Size</span>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">Size</span>
             <input
               type="range"
               min={1}
               max={60}
               value={toolSettings.size}
               onChange={(e) => setToolSettings({ ...toolSettings, size: Number(e.target.value) })}
-              className="w-16 sm:w-20 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+              className="w-12 sm:w-20 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
             />
             <span className="text-[10px] font-mono text-slate-300 w-4 text-right">
               {toolSettings.size}
@@ -882,6 +936,70 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
           setToolSettings((prev) => ({ ...prev, activeTool: 'eyedropper' }));
         }}
       />
+
+      {/* Mobile Tool Selection Modal Drawer */}
+      {isMobileToolsOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-2 sm:p-4">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-4 text-slate-100 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Wrench className="w-5 h-5 text-indigo-400" />
+                <h3 className="font-bold text-white text-sm">Select Drawing Tool</h3>
+              </div>
+              <button
+                onClick={() => setIsMobileToolsOpen(false)}
+                className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'pencil', label: 'Pencil', desc: 'Fine Sketching', icon: Pencil },
+                { id: 'ink', label: 'Ink Pen', desc: 'Clean Lines', icon: PenTool },
+                { id: 'brush', label: 'Paint Brush', desc: 'Painterly Strokes', icon: Paintbrush },
+                { id: 'marker', label: 'Highlighter', desc: 'Transparent Tint', icon: Highlighter },
+                { id: 'spray', label: 'Airbrush', desc: 'Particle Spray', icon: Sparkles },
+                { id: 'chalk', label: 'Chalk', desc: 'Textured Charcoal', icon: Flame },
+                { id: 'calligraphy', label: 'Calligraphy', desc: 'Angled Nib', icon: Feather },
+                { id: 'soft', label: 'Soft Airbrush', desc: 'Blur Edge', icon: Circle },
+                { id: 'eraser', label: 'Eraser', desc: 'Remove Strokes', icon: Eraser },
+                { id: 'fill', label: 'Paint Bucket', desc: 'Flood Fill', icon: PaintBucket },
+                { id: 'eyedropper', label: 'Eyedropper', desc: 'Pick Color', icon: Pipette },
+                { id: 'line', label: 'Line Tool', desc: 'Straight Lines', icon: Minus },
+                { id: 'rectangle', label: 'Rectangle', desc: 'Box Shape', icon: Square },
+                { id: 'ellipse', label: 'Circle', desc: 'Oval Shape', icon: Circle },
+              ].map((tool) => {
+                const Icon = tool.icon;
+                const isActive = toolSettings.activeTool === tool.id;
+                return (
+                  <button
+                    key={tool.id}
+                    onClick={() => {
+                      setToolSettings({ ...toolSettings, activeTool: tool.id as ToolType });
+                      setIsMobileToolsOpen(false);
+                    }}
+                    className={`flex items-center gap-2.5 p-2.5 rounded-2xl border text-left transition-all active:scale-95 ${
+                      isActive
+                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/30'
+                        : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className={`p-2 rounded-xl flex-shrink-0 ${isActive ? 'bg-white/20' : 'bg-slate-900 text-indigo-400'}`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="truncate">
+                      <div className="font-semibold text-xs text-white truncate">{tool.label}</div>
+                      <div className={`text-[10px] truncate ${isActive ? 'text-indigo-100' : 'text-slate-500'}`}>{tool.desc}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pairing QR Modal */}
       <PairingModal

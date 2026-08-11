@@ -121,14 +121,50 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const playbackTimerRef = useRef<number | null>(null);
 
+  // Toast Notifications
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToastMessage(null), 2500);
+  }, []);
+
+  // First-time onboarding banner
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem('duet_onboarding_dismissed');
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const handleDismissOnboarding = () => {
+    setShowOnboarding(false);
+    try {
+      localStorage.setItem('duet_onboarding_dismissed', 'true');
+    } catch (e) {}
+  };
+
+  // Pan & Spacebar State
+  const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
+  const isPanningRef = useRef<boolean>(false);
+  const lastPanPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Touch Gesture tracking for Pinch-to-Zoom & Pan
+  const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const initialPinchDistRef = useRef<number | null>(null);
+  const initialZoomRef = useRef<number>(1);
+
   // Autosave Project throttled
   const saveTimeoutRef = useRef<number | null>(null);
   const triggerAutosave = useCallback((updatedProject: Project) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = window.setTimeout(() => {
       saveProject(updatedProject);
-    }, 1000);
-  }, []);
+      showToast('Project saved');
+    }, 1200);
+  }, [showToast]);
 
   // Centralized Authoritative Mutation Commit
   const commitMutation = useCallback(
@@ -149,6 +185,156 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     [triggerAutosave]
   );
 
+  // Record undo state before modification
+  const pushUndo = useCallback((stateToSave: Project) => {
+    setUndoStack((prev) => [...prev.slice(-25), JSON.parse(JSON.stringify(stateToSave))]);
+    setRedoStack([]);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    if (undoStack.length === 0) return;
+    const previous = undoStack[undoStack.length - 1];
+    setRedoStack((prev) => [...prev, JSON.parse(JSON.stringify(project))]);
+    setUndoStack((prev) => prev.slice(0, prev.length - 1));
+    const nextRev = (project.revision || 1) + 1;
+    const restored = { ...previous, revision: nextRev, updatedAt: Date.now() };
+    setProject(restored);
+    syncService.sendProjectUpdate(restored);
+    triggerAutosave(restored);
+  }, [undoStack, project, triggerAutosave]);
+
+  const handleRedo = useCallback(() => {
+    if (redoStack.length === 0) return;
+    const next = redoStack[redoStack.length - 1];
+    setUndoStack((prev) => [...prev, JSON.parse(JSON.stringify(project))]);
+    setRedoStack((prev) => prev.slice(0, prev.length - 1));
+    const nextRev = (project.revision || 1) + 1;
+    const restored = { ...next, revision: nextRev, updatedAt: Date.now() };
+    setProject(restored);
+    syncService.sendProjectUpdate(restored);
+    triggerAutosave(restored);
+  }, [redoStack, project, triggerAutosave]);
+
+  // Wheel zoom and pan listener on container
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        // Zoom towards center
+        const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+        setZoom((prev) => Math.min(5, Math.max(0.5, prev * zoomFactor)));
+      } else {
+        // Pan
+        setPan((prev) => ({
+          x: prev.x - e.deltaX,
+          y: prev.y - e.deltaY,
+        }));
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  // Keyboard Shortcuts Handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        setIsSpacePressed(true);
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+          showToast('Redo');
+        } else {
+          handleUndo();
+          showToast('Undo');
+        }
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+        showToast('Redo');
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        setIsMobileToolsOpen(false);
+        setIsColorPickerOpen(false);
+        setIsLayerPanelOpen(false);
+        setIsDiagnosticsOpen(false);
+        setIsPairingOpen(false);
+        setIsExportOpen(false);
+        setIsOnionSettingsOpen(false);
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      const toolMap: Record<string, { tool: ToolType; label: string }> = {
+        b: { tool: 'brush', label: 'Paint Brush' },
+        p: { tool: 'pencil', label: 'Pencil' },
+        e: { tool: 'eraser', label: 'Eraser' },
+        i: { tool: 'eyedropper', label: 'Eyedropper' },
+        f: { tool: 'fill', label: 'Paint Bucket Fill' },
+        m: { tool: 'marker', label: 'Highlighter' },
+        s: { tool: 'spray', label: 'Airbrush' },
+        l: { tool: 'line', label: 'Line Tool' },
+        r: { tool: 'rectangle', label: 'Rectangle' },
+        c: { tool: 'ellipse', label: 'Circle' },
+      };
+
+      if (toolMap[key]) {
+        e.preventDefault();
+        setToolSettings((prev) => ({ ...prev, activeTool: toolMap[key].tool }));
+        showToast(`${toolMap[key].label} Tool Selected`);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setIsSpacePressed(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [handleUndo, handleRedo, showToast]);
+
+  // Convert client pixel position into normalized [0..1] canvas point considering Pan and Zoom
+  const getNormalizedPoint = useCallback((clientX: number, clientY: number, pressureVal: number = 0.5): Point => {
+    if (!canvasRef.current) return { x: 0, y: 0, pressure: pressureVal };
+    const rect = canvasRef.current.getBoundingClientRect();
+    const rawX = (clientX - rect.left) / rect.width;
+    const rawY = (clientY - rect.top) / rect.height;
+
+    const normX = (rawX - 0.5 - pan.x / rect.width) / zoom + 0.5;
+    const normY = (rawY - 0.5 - pan.y / rect.height) / zoom + 0.5;
+
+    return {
+      x: Math.max(0, Math.min(1, normX)),
+      y: Math.max(0, Math.min(1, normY)),
+      pressure: pressureVal,
+    };
+  }, [zoom, pan]);
+
   // Subscribe to snapshot requests from Device B
   useEffect(() => {
     const unsubscribe = syncService.subscribe((event, data) => {
@@ -159,36 +345,6 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     });
     return () => unsubscribe();
   }, [project, activeFrameIndex]);
-
-  // Record undo state before modification
-  const pushUndo = useCallback((stateToSave: Project) => {
-    setUndoStack((prev) => [...prev.slice(-25), JSON.parse(JSON.stringify(stateToSave))]);
-    setRedoStack([]);
-  }, []);
-
-  const handleUndo = () => {
-    if (undoStack.length === 0) return;
-    const previous = undoStack[undoStack.length - 1];
-    setRedoStack((prev) => [...prev, JSON.parse(JSON.stringify(project))]);
-    setUndoStack((prev) => prev.slice(0, prev.length - 1));
-    const nextRev = (project.revision || 1) + 1;
-    const restored = { ...previous, revision: nextRev, updatedAt: Date.now() };
-    setProject(restored);
-    syncService.sendProjectUpdate(restored);
-    triggerAutosave(restored);
-  };
-
-  const handleRedo = () => {
-    if (redoStack.length === 0) return;
-    const next = redoStack[redoStack.length - 1];
-    setUndoStack((prev) => [...prev, JSON.parse(JSON.stringify(project))]);
-    setRedoStack((prev) => prev.slice(0, prev.length - 1));
-    const nextRev = (project.revision || 1) + 1;
-    const restored = { ...next, revision: nextRev, updatedAt: Date.now() };
-    setProject(restored);
-    syncService.sendProjectUpdate(restored);
-    triggerAutosave(restored);
-  };
 
   // Synchronize canvas rendering
   const renderPass = useCallback(() => {
@@ -305,10 +461,32 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     };
   }, [isPlaying, project.settings.fps, project.frames.length]);
 
-  // Pointer & Touch Handlers
+  // Pointer & Touch Handlers with Zoom, Pan, and Multi-touch Support
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (isPlaying) setIsPlaying(false);
     if (!canvasRef.current) return;
+
+    // Track active pointer for pinch-zoom
+    activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // Handle spacebar pan or middle mouse button pan
+    if (isSpacePressed || e.button === 1) {
+      isPanningRef.current = true;
+      lastPanPosRef.current = { x: e.clientX, y: e.clientY };
+      canvasRef.current.setPointerCapture(e.pointerId);
+      return;
+    }
+
+    // Two-finger pinch gesture detected
+    if (activePointersRef.current.size >= 2) {
+      setIsDrawing(false);
+      setCurrentStrokePoints([]);
+      const pts = Array.from(activePointersRef.current.values()) as { x: number; y: number }[];
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      initialPinchDistRef.current = dist;
+      initialZoomRef.current = zoom;
+      return;
+    }
 
     // Verify active layer is unlocked and visible
     const currentLayer = project.layers.find((l) => l.id === activeLayerId);
@@ -316,25 +494,25 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
 
     canvasRef.current.setPointerCapture(e.pointerId);
 
-    const rect = canvasRef.current.getBoundingClientRect();
-    const rawX = (e.clientX - rect.left) / rect.width;
-    const rawY = (e.clientY - rect.top) / rect.height;
     const pressure = e.pressure && e.pressure > 0 ? e.pressure : 0.5;
-
-    const initialPoint: Point = { x: rawX, y: rawY, pressure };
+    const initialPoint = getNormalizedPoint(e.clientX, e.clientY, pressure);
 
     // Eyedropper tool execution
     if (toolSettings.activeTool === 'eyedropper') {
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext('2d');
       if (ctx && canvas) {
-        const px = Math.floor(rawX * canvas.width);
-        const py = Math.floor(rawY * canvas.height);
-        const pixelData = ctx.getImageData(px, py, 1, 1).data;
-        if (pixelData[3] > 0) {
-          const hex = `#${((1 << 24) + (pixelData[0] << 16) + (pixelData[1] << 8) + pixelData[2]).toString(16).slice(1)}`;
-          handleColorChange(hex);
-        }
+        const rect = canvas.getBoundingClientRect();
+        const px = Math.floor(((e.clientX - rect.left) / rect.width) * canvas.width);
+        const py = Math.floor(((e.clientY - rect.top) / rect.height) * canvas.height);
+        try {
+          const pixelData = ctx.getImageData(px, py, 1, 1).data;
+          if (pixelData[3] > 0) {
+            const hex = `#${((1 << 24) + (pixelData[0] << 16) + (pixelData[1] << 8) + pixelData[2]).toString(16).slice(1)}`;
+            handleColorChange(hex);
+            showToast(`Color sampled: ${hex.toUpperCase()}`);
+          }
+        } catch (err) {}
       }
       setToolSettings((prev) => ({ ...prev, activeTool: 'pencil' }));
       return;
@@ -392,14 +570,34 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // Update active pointer position
+    if (activePointersRef.current.has(e.pointerId)) {
+      activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    // Handle spacebar / middle-mouse panning
+    if (isPanningRef.current) {
+      const dx = e.clientX - lastPanPosRef.current.x;
+      const dy = e.clientY - lastPanPosRef.current.y;
+      setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+      lastPanPosRef.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
+
+    // Two-finger pinch zoom
+    if (activePointersRef.current.size >= 2 && initialPinchDistRef.current) {
+      const pts = Array.from(activePointersRef.current.values()) as { x: number; y: number }[];
+      const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      const scale = currentDist / initialPinchDistRef.current;
+      const newZoom = Math.min(5, Math.max(0.5, initialZoomRef.current * scale));
+      setZoom(newZoom);
+      return;
+    }
+
     if (!isDrawing || !canvasRef.current) return;
 
-    const rect = canvasRef.current.getBoundingClientRect();
-    const rawX = (e.clientX - rect.left) / rect.width;
-    const rawY = (e.clientY - rect.top) / rect.height;
     const pressure = e.pressure && e.pressure > 0 ? e.pressure : 0.5;
-
-    const rawPoint: Point = { x: rawX, y: rawY, pressure };
+    const rawPoint = getNormalizedPoint(e.clientX, e.clientY, pressure);
     const smoothedPoint = stabilizePoint(rawPoint, currentStrokePoints, toolSettings.stabilizer);
 
     setCurrentStrokePoints((prev) => {
@@ -411,6 +609,16 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    activePointersRef.current.delete(e.pointerId);
+
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+    }
+
+    if (activePointersRef.current.size < 2) {
+      initialPinchDistRef.current = null;
+    }
+
     if (!isDrawing) return;
 
     if (canvasRef.current && canvasRef.current.hasPointerCapture(e.pointerId)) {
@@ -467,6 +675,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     // Sync stroke end event
     syncService.sendStrokeEnd(newStroke);
   };
+
 
   const handlePointerCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (canvasRef.current && canvasRef.current.hasPointerCapture(e.pointerId)) {
@@ -572,17 +781,44 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   };
 
   return (
-    <div className="relative w-screen h-screen bg-slate-950 text-slate-100 flex flex-col justify-between overflow-hidden select-none">
+    <div className="relative w-screen h-screen bg-slate-950 text-slate-100 flex flex-col justify-between overflow-hidden select-none pl-safe pr-safe pt-safe pb-safe">
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-indigo-600 text-white text-xs font-semibold shadow-2xl border border-indigo-400/30 animate-in fade-in zoom-in duration-200 flex items-center gap-2">
+          <Check className="w-3.5 h-3.5" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Onboarding Tip Banner */}
+      {showOnboarding && (
+        <div className="bg-gradient-to-r from-indigo-900/90 via-slate-900 to-indigo-950/90 border-b border-indigo-500/30 px-3 py-1.5 text-xs text-indigo-200 flex items-center justify-between z-30">
+          <div className="flex items-center gap-2 truncate">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+            <span className="truncate">
+              <strong>Tip:</strong> Draw here, or click <strong>Pair Second Screen</strong> to stream your live animation canvas to another device!
+            </span>
+          </div>
+          <button
+            onClick={handleDismissOnboarding}
+            className="p-1 text-slate-400 hover:text-white rounded ml-2 flex-shrink-0"
+            title="Dismiss tip"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Top Header Bar */}
-      <header className="h-11 sm:h-14 px-2.5 sm:px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between z-20">
+      <header className="h-10 sm:h-14 landscape:h-10 px-2 sm:px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between z-20">
         {/* Left: Home & Title */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={onReturnHome}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             title="Return to Home"
           >
-            <Home className="w-5 h-5" />
+            <Home className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
           <input
@@ -593,7 +829,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
               setProject(updated);
               triggerAutosave(updated);
             }}
-            className="bg-transparent text-sm font-semibold text-white hover:bg-slate-800/60 focus:bg-slate-800 px-2 py-1 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[160px] sm:max-w-[240px] truncate"
+            className="bg-transparent text-xs sm:text-sm font-semibold text-white hover:bg-slate-800/60 focus:bg-slate-800 px-2 py-1 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[120px] sm:max-w-[220px] truncate"
           />
         </div>
 
@@ -601,57 +837,57 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsPairingOpen(true)}
-            className={`flex items-center gap-2 py-1.5 px-3 rounded-xl text-xs font-semibold shadow-md transition-all active:scale-95 ${
+            className={`flex items-center gap-1.5 py-1 px-2.5 sm:py-1.5 sm:px-3 rounded-xl text-[11px] sm:text-xs font-semibold shadow-md transition-all active:scale-95 ${
               sessionState.hasDisplayDevice
                 ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
                 : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-600/20'
             }`}
           >
-            <QrCode className="w-4 h-4" />
+            <QrCode className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>
-              {sessionState.hasDisplayDevice ? 'Display Connected' : 'Pair Second Screen'}
+              {sessionState.hasDisplayDevice ? 'Display Live' : 'Pair Screen'}
             </span>
           </button>
         </div>
 
         {/* Right: Undo/Redo & Export */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 sm:gap-1.5">
           <button
             onClick={handleUndo}
             disabled={undoStack.length === 0}
-            className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 disabled:opacity-30 transition-colors"
-            title="Undo"
+            className="p-1.5 sm:p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 disabled:opacity-30 transition-colors"
+            title="Undo (Ctrl+Z)"
           >
-            <Undo2 className="w-4 h-4" />
+            <Undo2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
           <button
             onClick={handleRedo}
             disabled={redoStack.length === 0}
-            className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 disabled:opacity-30 transition-colors"
-            title="Redo"
+            className="p-1.5 sm:p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 disabled:opacity-30 transition-colors"
+            title="Redo (Ctrl+Y)"
           >
-            <Redo2 className="w-4 h-4" />
+            <Redo2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
-          <div className="h-4 w-px bg-slate-800 mx-1" />
+          <div className="h-4 w-px bg-slate-800 mx-0.5 sm:mx-1" />
 
           <button
             onClick={() => setIsExportOpen(true)}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+            className="p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
             title="Export Animation"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
           <button
             onClick={() => setIsDiagnosticsOpen(!isDiagnosticsOpen)}
-            className={`p-2 rounded-lg transition-colors ${
+            className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
               isDiagnosticsOpen ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
             }`}
             title="Diagnostics"
           >
-            <Activity className="w-4 h-4" />
+            <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         </div>
       </header>
@@ -661,22 +897,22 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
         {/* Desktop Docked Left Toolbar */}
         <aside className="hidden md:flex absolute top-4 left-4 z-20 flex-col items-center gap-1.5 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md p-2 rounded-2xl shadow-2xl max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
           {[
-            { id: 'pencil', label: 'Pencil (Fine Sketch)', icon: Pencil },
+            { id: 'pencil', label: 'Pencil (Fine Sketch - Key: P)', icon: Pencil },
             { id: 'ink', label: 'Ink Pen (Clean Lines)', icon: PenTool },
-            { id: 'brush', label: 'Paint Brush (Painterly)', icon: Paintbrush },
-            { id: 'marker', label: 'Highlighter / Marker', icon: Highlighter },
-            { id: 'spray', label: 'Airbrush / Spray', icon: Sparkles },
+            { id: 'brush', label: 'Paint Brush (Painterly - Key: B)', icon: Paintbrush },
+            { id: 'marker', label: 'Highlighter / Marker (Key: M)', icon: Highlighter },
+            { id: 'spray', label: 'Airbrush / Spray (Key: S)', icon: Sparkles },
             { id: 'chalk', label: 'Chalk / Charcoal', icon: Flame },
             { id: 'calligraphy', label: 'Calligraphy Chisel', icon: Feather },
             { id: 'soft', label: 'Soft Airbrush / Blur', icon: Circle },
             { id: 'div-1', isDivider: true },
-            { id: 'eraser', label: 'Eraser', icon: Eraser },
-            { id: 'fill', label: 'Paint Bucket Fill', icon: PaintBucket },
-            { id: 'eyedropper', label: 'Color Eyedropper', icon: Pipette },
+            { id: 'eraser', label: 'Eraser (Key: E)', icon: Eraser },
+            { id: 'fill', label: 'Paint Bucket Fill (Key: F)', icon: PaintBucket },
+            { id: 'eyedropper', label: 'Color Eyedropper (Key: I)', icon: Pipette },
             { id: 'div-2', isDivider: true },
-            { id: 'line', label: 'Line Tool', icon: Minus },
-            { id: 'rectangle', label: 'Rectangle', icon: Square },
-            { id: 'ellipse', label: 'Circle', icon: Circle },
+            { id: 'line', label: 'Line Tool (Key: L)', icon: Minus },
+            { id: 'rectangle', label: 'Rectangle (Key: R)', icon: Square },
+            { id: 'ellipse', label: 'Circle (Key: C)', icon: Circle },
           ].map((item) => {
             if ('isDivider' in item) {
               return <div key={item.id} className="w-6 h-px bg-slate-800 my-0.5" />;
@@ -686,7 +922,10 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
             return (
               <button
                 key={item.id}
-                onClick={() => setToolSettings({ ...toolSettings, activeTool: item.id as ToolType })}
+                onClick={() => {
+                  setToolSettings({ ...toolSettings, activeTool: item.id as ToolType });
+                  showToast(`${item.label.split(' ')[0]} selected`);
+                }}
                 className={`p-2.5 rounded-xl transition-all relative group ${
                   isActive
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105'
@@ -704,12 +943,12 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
         </aside>
 
         {/* Mobile Compact Tool Selector Pill */}
-        <div className="flex md:hidden absolute top-3 left-3 z-20 items-center gap-1.5 bg-slate-900/95 border border-slate-800 backdrop-blur-md p-1.5 pl-2.5 rounded-xl shadow-xl">
+        <div className="flex md:hidden absolute top-2 left-2 sm:top-3 sm:left-3 z-20 items-center gap-1.5 bg-slate-900/95 border border-slate-800 backdrop-blur-md p-1 pl-2 rounded-xl shadow-xl">
           <button
             onClick={() => setIsMobileToolsOpen(true)}
-            className="flex items-center gap-2 text-xs font-semibold text-slate-200 active:scale-95 transition-transform"
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 active:scale-95 transition-transform"
           >
-            <span className="p-1.5 rounded-lg bg-indigo-600 text-white shadow">
+            <span className="p-1 rounded-lg bg-indigo-600 text-white shadow">
               {(() => {
                 const tools: Record<string, React.FC<{ className?: string }>> = {
                   pencil: Pencil,
@@ -728,28 +967,28 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
                   ellipse: Circle,
                 };
                 const ActiveIcon = tools[toolSettings.activeTool] || Pencil;
-                return <ActiveIcon className="w-4 h-4" />;
+                return <ActiveIcon className="w-3.5 h-3.5" />;
               })()}
             </span>
-            <span className="capitalize font-medium text-slate-300">{toolSettings.activeTool}</span>
-            <Wrench className="w-3.5 h-3.5 text-indigo-400 ml-0.5" />
+            <span className="capitalize font-medium text-slate-300 text-[11px] sm:text-xs">{toolSettings.activeTool}</span>
+            <Wrench className="w-3 h-3 text-indigo-400 ml-0.5" />
           </button>
         </div>
 
-        {/* Floating Tool Customizer (Color, Size, Opacity, Stabilizer) */}
-        <aside className="absolute top-3 right-3 md:top-4 md:right-4 z-20 flex items-center gap-2.5 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md px-2.5 py-1.5 md:px-3 md:py-2 rounded-2xl shadow-2xl text-xs">
+        {/* Floating Contextual Tool Customizer (Color, Size, Opacity, Stabilizer) */}
+        <aside className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 z-20 flex items-center gap-2 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md px-2 py-1 md:px-3 md:py-2 rounded-2xl shadow-2xl text-xs">
           {/* Color Palette Button */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setIsColorPickerOpen(true)}
-              className="flex items-center gap-2 p-1 pr-2 sm:p-1.5 sm:pr-2.5 rounded-xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700/80 transition-all active:scale-95 group"
+              className="flex items-center gap-1.5 p-1 pr-1.5 sm:p-1.5 sm:pr-2.5 rounded-xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700/80 transition-all active:scale-95 group"
               title="Open Color Palette & Picker"
             >
               <div
-                className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg border border-slate-600 shadow-inner flex items-center justify-center transition-transform group-hover:scale-105"
+                className="w-4 h-4 sm:w-6 sm:h-6 rounded-lg border border-slate-600 shadow-inner flex items-center justify-center transition-transform group-hover:scale-105"
                 style={{ backgroundColor: toolSettings.color }}
               />
-              <Palette className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+              <Palette className="w-3 h-3 sm:w-4 sm:h-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
               <span className="hidden lg:inline text-[11px] font-mono text-slate-300 uppercase">{toolSettings.color}</span>
             </button>
 
@@ -759,7 +998,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
                 <button
                   key={c}
                   onClick={() => handleColorChange(c)}
-                  className={`w-5 h-5 rounded-lg border transition-all ${
+                  className={`w-4 h-4 sm:w-5 sm:h-5 rounded-lg border transition-all ${
                     toolSettings.color.toLowerCase() === c.toLowerCase()
                       ? 'border-white scale-110 z-10 shadow'
                       : 'border-slate-800 hover:border-slate-600 hover:scale-105'
@@ -771,64 +1010,113 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
             </div>
           </div>
 
-          <div className="h-4 w-px bg-slate-800" />
+          {toolSettings.activeTool !== 'eyedropper' && <div className="h-4 w-px bg-slate-800" />}
 
-          {/* Size Slider */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">Size</span>
-            <input
-              type="range"
-              min={1}
-              max={60}
-              value={toolSettings.size}
-              onChange={(e) => setToolSettings({ ...toolSettings, size: Number(e.target.value) })}
-              className="w-12 sm:w-20 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-            />
-            <span className="text-[10px] font-mono text-slate-300 w-4 text-right">
-              {toolSettings.size}
-            </span>
-          </div>
-
-          <div className="h-4 w-px bg-slate-800 hidden md:block" />
+          {/* Size Slider (For Brush/Pencil/Eraser/Shapes) */}
+          {toolSettings.activeTool !== 'eyedropper' && toolSettings.activeTool !== 'fill' && (
+            <div className="flex items-center gap-1 sm:gap-2">
+              <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">Size</span>
+              <input
+                type="range"
+                min={1}
+                max={60}
+                value={toolSettings.size}
+                onChange={(e) => setToolSettings({ ...toolSettings, size: Number(e.target.value) })}
+                className="w-10 sm:w-20 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+              />
+              <span className="text-[10px] font-mono text-slate-300 w-3 sm:w-4 text-right">
+                {toolSettings.size}
+              </span>
+            </div>
+          )}
 
           {/* Opacity Slider */}
-          <div className="hidden md:flex items-center gap-2">
-            <span className="text-[10px] font-mono text-slate-400">Opacity</span>
-            <input
-              type="range"
-              min={0.1}
-              max={1}
-              step={0.05}
-              value={toolSettings.opacity}
-              onChange={(e) => setToolSettings({ ...toolSettings, opacity: Number(e.target.value) })}
-              className="w-16 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-            />
-            <span className="text-[10px] font-mono text-slate-300 w-7 text-right">
-              {Math.round(toolSettings.opacity * 100)}%
-            </span>
-          </div>
-
-          <div className="h-4 w-px bg-slate-800 hidden lg:block" />
+          {toolSettings.activeTool !== 'eyedropper' && (
+            <>
+              <div className="h-4 w-px bg-slate-800 hidden md:block" />
+              <div className="hidden md:flex items-center gap-2">
+                <span className="text-[10px] font-mono text-slate-400">Opacity</span>
+                <input
+                  type="range"
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  value={toolSettings.opacity}
+                  onChange={(e) => setToolSettings({ ...toolSettings, opacity: Number(e.target.value) })}
+                  className="w-14 sm:w-16 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                />
+                <span className="text-[10px] font-mono text-slate-300 w-7 text-right">
+                  {Math.round(toolSettings.opacity * 100)}%
+                </span>
+              </div>
+            </>
+          )}
 
           {/* Stabilizer Level */}
-          <div className="hidden lg:flex items-center gap-2">
-            <span className="text-[10px] font-mono text-slate-400">Smooth</span>
-            <input
-              type="range"
-              min={0}
-              max={10}
-              value={toolSettings.stabilizer}
-              onChange={(e) => setToolSettings({ ...toolSettings, stabilizer: Number(e.target.value) })}
-              className="w-14 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-            />
-            <span className="text-[10px] font-mono text-slate-300 w-3 text-right">
-              {toolSettings.stabilizer}
+          {toolSettings.activeTool !== 'eyedropper' && toolSettings.activeTool !== 'fill' && (
+            <>
+              <div className="h-4 w-px bg-slate-800 hidden lg:block" />
+              <div className="hidden lg:flex items-center gap-2">
+                <span className="text-[10px] font-mono text-slate-400">Smooth</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={10}
+                  value={toolSettings.stabilizer}
+                  onChange={(e) => setToolSettings({ ...toolSettings, stabilizer: Number(e.target.value) })}
+                  className="w-14 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                />
+                <span className="text-[10px] font-mono text-slate-300 w-3 text-right">
+                  {toolSettings.stabilizer}
+                </span>
+              </div>
+            </>
+          )}
+
+          {/* Eyedropper hint */}
+          {toolSettings.activeTool === 'eyedropper' && (
+            <span className="text-[11px] font-medium text-indigo-300 px-1">
+              Tap canvas to sample color
             </span>
-          </div>
+          )}
         </aside>
 
+        {/* Zoom & Pan Overlay Controls */}
+        <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md px-2 py-1 rounded-xl shadow-xl text-xs">
+          <button
+            onClick={() => setZoom((prev) => Math.max(0.5, prev * 0.85))}
+            className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+            title="Zoom Out"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+          <span className="font-mono text-[11px] text-slate-300 w-12 text-center font-semibold">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            onClick={() => setZoom((prev) => Math.min(5, prev * 1.15))}
+            className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+            title="Zoom In"
+          >
+            <ChevronDown className="w-3.5 h-3.5 rotate-180" />
+          </button>
+          {(zoom !== 1 || pan.x !== 0 || pan.y !== 0) && (
+            <button
+              onClick={() => {
+                setZoom(1);
+                setPan({ x: 0, y: 0 });
+                showToast('Zoom Reset');
+              }}
+              className="ml-1 px-1.5 py-0.5 rounded bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600 hover:text-white text-[10px] font-semibold transition-colors"
+              title="Reset Zoom and Center Canvas"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+
         {/* Dedicated Interactive Animation Canvas */}
-        <div ref={containerRef} className="w-full h-full flex items-center justify-center p-1.5 sm:p-3 landscape:p-1">
+        <div ref={containerRef} className="w-full h-full flex items-center justify-center p-1 sm:p-2.5 landscape:p-0.5">
           <canvas
             ref={canvasRef}
             onPointerDown={handlePointerDown}
@@ -839,6 +1127,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
           />
         </div>
       </div>
+
 
       {/* Bottom Timeline */}
       <Timeline

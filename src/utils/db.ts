@@ -173,3 +173,28 @@ export async function deleteProject(id: string): Promise<void> {
   deleteProjectFromSupabase(id).catch(() => {});
 }
 
+export async function deleteAllProjects(): Promise<void> {
+  // First list all project IDs so we can delete from Supabase as well
+  let allIds: string[] = [];
+  try {
+    const projects = await listAllProjects();
+    allIds = projects.map((p) => p.id);
+  } catch (e) {}
+
+  try {
+    const db = await getDB();
+    const tx = db.transaction([PROJECTS_STORE, META_STORE], 'readwrite');
+    tx.objectStore(PROJECTS_STORE).clear();
+    tx.objectStore(META_STORE).clear();
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.error('Failed to clear local IndexedDB projects:', err);
+  }
+
+  // Delete all from Supabase as well
+  await Promise.all(allIds.map((id) => deleteProjectFromSupabase(id).catch(() => {})));
+}
+

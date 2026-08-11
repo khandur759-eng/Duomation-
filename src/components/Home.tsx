@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Project } from '../types/animation';
-import { listAllProjects, deleteProject } from '../utils/db';
+import { listAllProjects, deleteProject, deleteAllProjects } from '../utils/db';
 import { checkSupabaseConnection, SUPABASE_PROJECT_ID } from '../lib/supabase';
 import { Plus, Monitor, Smartphone, FolderOpen, Trash2, Upload, Sparkles, Database, CheckCircle2 } from 'lucide-react';
 
@@ -35,6 +35,13 @@ export const Home: React.FC<HomeProps> = ({
     e.stopPropagation();
     if (confirm('Delete this animation project?')) {
       await deleteProject(id);
+      await reloadProjects();
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (confirm(`Are you sure you want to delete ALL ${recentProjects.length} animation project(s)? This action cannot be undone.`)) {
+      await deleteAllProjects();
       await reloadProjects();
     }
   };
@@ -163,6 +170,16 @@ export const Home: React.FC<HomeProps> = ({
               <FolderOpen className="w-4 h-4 text-indigo-400" />
               Recent Projects ({recentProjects.length})
             </h3>
+            {recentProjects.length > 0 && (
+              <button
+                onClick={handleClearAll}
+                className="flex items-center gap-1.5 py-1 px-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 text-xs font-medium transition-colors"
+                title="Delete all recent projects"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Clear All Projects</span>
+              </button>
+            )}
           </div>
 
           {recentProjects.length === 0 ? (

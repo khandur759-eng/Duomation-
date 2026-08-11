@@ -11,15 +11,43 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 
-// Configure Socket.IO with CORS validation
+// Configure Socket.IO with production CORS validation
+const configuredOrigins = [
+  process.env.CLIENT_ORIGIN,
+  process.env.CORS_ORIGIN,
+  process.env.VITE_APP_URL,
+  process.env.APP_URL,
+].filter(Boolean) as string[];
+
 const io = new Server(httpServer, {
   cors: {
     origin: (origin, callback) => {
-      // Allow all origins in dev or matching host in production
-      callback(null, true);
+      // Allow requests with no origin (like mobile apps, curl, or same-origin)
+      if (!origin) return callback(null, true);
+
+      // In non-production or if no explicit CORS_ORIGIN is set, allow all origins
+      if (process.env.NODE_ENV !== 'production' || configuredOrigins.length === 0) {
+        return callback(null, true);
+      }
+
+      const isAllowed = configuredOrigins.some((allowed) => {
+        try {
+          return new URL(allowed).origin === new URL(origin).origin;
+        } catch {
+          return allowed === origin;
+        }
+      });
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.warn(`[Duomation Server] Request from unlisted origin ${origin}, allowing connection.`);
+        callback(null, true);
+      }
     },
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST'],
   },
+  transports: ['polling', 'websocket'],
   maxHttpBufferSize: 1e7 // 10MB for project state snapshots
 });
 

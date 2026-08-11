@@ -36,15 +36,28 @@ class SyncService {
     const socketUrl = getSocketUrl();
     const envName = (import.meta as any).env?.MODE || 'production';
 
+    if (!socketUrl) {
+      const errorMsg = 'Realtime server URL is not configured. Set VITE_SOCKET_URL in the deployment environment.';
+      console.error('[Duomation Sync]', errorMsg);
+      this.updateState({
+        statusText: 'Realtime Unconfigured',
+        sessionError: errorMsg,
+      });
+      return;
+    }
+
     console.log(`[Duomation Sync] socket URL = ${socketUrl}`);
     console.log(`[Duomation Sync] environment = ${envName}`);
-    console.log(`[Duomation Sync] transport = websocket/polling`);
+    console.log(`[Duomation Sync] transports = ['polling', 'websocket']`);
 
     this.socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
+      upgrade: true,
       autoConnect: true,
+      reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
+      timeout: 10000,
     });
 
     this.socket.on('connect', () => {
@@ -52,7 +65,7 @@ class SyncService {
         id: this.socket?.id,
         transport: (this.socket?.io as any)?.engine?.transport?.name,
       });
-      this.updateState({ statusText: 'Connected' });
+      this.updateState({ statusText: 'Connected', sessionError: null });
       this.startPingCheck();
 
       // Attempt auto-rejoin if previous session is saved and fresh
@@ -79,8 +92,15 @@ class SyncService {
     });
 
     this.socket.on('connect_error', (err) => {
-      console.error('[Duomation Sync] Production realtime connection failed:', err?.message || err);
-      this.updateState({ statusText: 'Connection Error (retrying...)' });
+      console.error('[Duomation Sync] Production realtime connection failed:', {
+        url: socketUrl,
+        message: err?.message || err,
+        transport: (this.socket?.io as any)?.engine?.transport?.name || 'unknown',
+      });
+      this.updateState({
+        statusText: 'Connection Error (retrying...)',
+        sessionError: 'Unable to connect to realtime server.',
+      });
       this.notifyListeners('connect_error', err);
     });
 
@@ -153,9 +173,19 @@ class SyncService {
 
   private ensureConnected(): Promise<{ connected: boolean; error?: string }> {
     return new Promise((resolve) => {
+      const socketUrl = getSocketUrl();
+      if (!socketUrl) {
+        const unconfiguredErr = 'Realtime server URL is not configured. Set VITE_SOCKET_URL in the deployment environment.';
+        this.updateState({
+          statusText: 'Realtime Unconfigured',
+          sessionError: unconfiguredErr,
+        });
+        return resolve({ connected: false, error: unconfiguredErr });
+      }
+
       if (!this.socket) this.init();
       if (!this.socket) {
-        return resolve({ connected: false, error: 'Socket not initialized' });
+        return resolve({ connected: false, error: 'Realtime client failed to initialize' });
       }
 
       if (this.socket.connected) {
@@ -196,7 +226,7 @@ class SyncService {
               : 'Unable to connect to the Duomation realtime server.',
           });
         }
-      }, 5000);
+      }, 10000);
     });
   }
 

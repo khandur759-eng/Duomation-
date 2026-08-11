@@ -889,6 +889,10 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
         onClose={() => setIsPairingOpen(false)}
         code={sessionState.code}
         role="draw"
+        isCreatingSession={sessionState.isCreatingSession}
+        sessionError={sessionState.sessionError}
+        onRetryCreateSession={() => syncService.createSession(project)}
+        hasDisplayDevice={sessionState.hasDisplayDevice}
         onJoinSession={() => {}}
       />
 

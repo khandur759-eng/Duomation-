@@ -90,6 +90,8 @@ export interface SessionState {
   lastSyncTime?: number;
   pingMs?: number;
   statusText: string;
+  isCreatingSession?: boolean;
+  sessionError?: string | null;
 }
 
 export interface ToolSettings {

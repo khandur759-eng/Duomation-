@@ -267,12 +267,14 @@ class SyncService {
     }
 
     this.isCreatingSession = true;
+    this.updateState({ isCreatingSession: true, sessionError: null, statusText: 'Creating Session...' });
+
     try {
       const conn = await this.ensureConnected();
       if (!conn.connected || !this.socket) {
         this.isCreatingSession = false;
         const err = conn.error || 'Unable to connect to the Duomation realtime server.';
-        this.updateState({ statusText: 'Connection Failed' });
+        this.updateState({ isCreatingSession: false, sessionError: err, statusText: 'Connection Failed' });
         return { success: false, error: err };
       }
 
@@ -283,13 +285,11 @@ class SyncService {
             resolved = true;
             this.isCreatingSession = false;
             console.warn('[Duomation Sync] createSession timeout reached waiting for server response.');
-            this.updateState({ statusText: 'Server Timeout' });
-            resolve({
-              success: false,
-              error: 'The realtime server did not respond while creating the pairing session.',
-            });
+            const err = 'The realtime server did not respond while creating the pairing session.';
+            this.updateState({ isCreatingSession: false, sessionError: err, statusText: 'Server Timeout' });
+            resolve({ success: false, error: err });
           }
-        }, 5000);
+        }, 12000);
 
         this.socket?.emit('create-session', { project }, (res: any) => {
           if (resolved) return;
@@ -305,18 +305,22 @@ class SyncService {
               role: 'draw',
               connectedDevices: res.connectedDevices || 1,
               statusText: 'Session Active',
+              isCreatingSession: false,
+              sessionError: null,
             });
             resolve({ success: true, sessionId: res.sessionId, code: res.code });
           } else {
-            this.updateState({ statusText: 'Session Creation Failed' });
-            resolve({ success: false, error: res?.error || 'Failed to create session.' });
+            const err = res?.error || 'Failed to create session.';
+            this.updateState({ isCreatingSession: false, sessionError: err, statusText: 'Session Creation Failed' });
+            resolve({ success: false, error: err });
           }
         });
       });
     } catch (e: any) {
       this.isCreatingSession = false;
-      this.updateState({ statusText: 'Socket Error' });
-      return { success: false, error: e?.message || 'Unable to connect to the Duomation realtime server.' };
+      const err = e?.message || 'Unable to connect to the Duomation realtime server.';
+      this.updateState({ isCreatingSession: false, sessionError: err, statusText: 'Socket Error' });
+      return { success: false, error: err };
     }
   }
 

@@ -112,6 +112,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   // Zoom & Pan state
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+const [canvasRotation, setCanvasRotation] = useState<0 | 90>(0);
 
   // Real-time Drawing state
   const [isDrawing, setIsDrawing] = useState<boolean>(false);

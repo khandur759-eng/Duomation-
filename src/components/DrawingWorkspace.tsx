@@ -378,21 +378,7 @@ const getNormalizedPoint = useCallback(
   },
   [zoom, pan, canvasRotation]
 );
-    if (!canvasRef.current) return { x: 0, y: 0, pressure: pressureVal };
-    const rect = canvasRef.current.getBoundingClientRect();
-    const rawX = (clientX - rect.left) / rect.width;
-    const rawY = (clientY - rect.top) / rect.height;
-
-    const normX = (rawX - 0.5 - pan.x / rect.width) / zoom + 0.5;
-    const normY = (rawY - 0.5 - pan.y / rect.height) / zoom + 0.5;
-
-    return {
-      x: Math.max(0, Math.min(1, normX)),
-      y: Math.max(0, Math.min(1, normY)),
-      pressure: pressureVal,
-    };
-  }, [zoom, pan]);
-
+    
   // Subscribe to snapshot requests from Device B
   useEffect(() => {
     const unsubscribe = syncService.subscribe((event, data) => {

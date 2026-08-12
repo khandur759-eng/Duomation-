@@ -426,9 +426,34 @@ const getNormalizedPoint = useCallback(
 
     // Draw live brush/tool cursor overlay
     const ctx = canvasRef.current.getContext('2d');
-    if (ctx && cursorPosRef.current.visible) {
-      drawCursorOverlay(ctx, cursorPosRef.current, toolSettings, zoom, canvasRef.current);
-    }
+   if (ctx && cursorPosRef.current.visible) {
+  const rect = canvasRef.current.getBoundingClientRect();
+
+  let cursorX = cursorPosRef.current.x;
+  let cursorY = cursorPosRef.current.y;
+
+  if (canvasRotation === 90) {
+    const rawX = (cursorX - rect.left) / rect.width;
+    const rawY = (cursorY - rect.top) / rect.height;
+
+    // Convert the screen position back into the
+    // rotated canvas coordinate system.
+    cursorX = rect.left + rawY * rect.width;
+    cursorY = rect.top + (1 - rawX) * rect.height;
+  }
+
+  drawCursorOverlay(
+    ctx,
+    {
+      x: cursorX,
+      y: cursorY,
+      visible: true,
+    },
+    toolSettings,
+    zoom,
+    canvasRef.current
+  );
+}
   }, [
     project,
     activeFrameIndex,

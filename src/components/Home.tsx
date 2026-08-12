@@ -76,7 +76,7 @@ export const Home: React.FC<HomeProps> = ({
               D
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white tracking-tight">DUET</h1>
+              <h1 className="text-xl font-bold text-white tracking-tight">Duomation</h1>
               <p className="text-xs text-slate-400 font-mono">2D Animation Workstation</p>
             </div>
           </div>

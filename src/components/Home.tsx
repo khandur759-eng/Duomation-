@@ -106,7 +106,7 @@ export const Home: React.FC<HomeProps> = ({
   };
 
   return (
-    <div className="min-h-screen w-full overflow-y-auto overflow-x-hidden bg-[#f7f7fb] text-slate-950 flex flex-col p-5 sm:p-7 md:p-10 lg:p-14 selection:bg-indigo-200 selection:text-indigo-950">
+    <div className="h-screen w-full overflow-y-auto overflow-x-hidden bg-[#f7f7fb] text-slate-950 flex flex-col p-5 sm:p-7 md:p-10 lg:p-14 selection:bg-indigo-200 selection:text-indigo-950">
 
       {/* Floating animation styles — visual only */}
       <style>{`

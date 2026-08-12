@@ -218,7 +218,7 @@ export const Home: React.FC<HomeProps> = ({
       </div>
 
       <footer className="text-center text-xs text-slate-600 mt-12 font-mono">
-        Duet Workstation • Latency-optimized 2D Animation Protocol
+        Duomation Workstation • Latency-optimized 2D Animation Protocol
       </footer>
     </div>
   );

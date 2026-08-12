@@ -1254,6 +1254,10 @@ const [canvasRotation, setCanvasRotation] = useState<0 | 90>(0);
             onPointerEnter={handlePointerEnter}
             onPointerLeave={handlePointerLeave}
             className="w-full h-full object-contain touch-none cursor-crosshair shadow-2xl rounded-lg"
+style={{
+  transform: `rotate(${canvasRotation}deg)`,
+  transition: 'transform 500ms ease',
+}}
           />
         </div>
       </div>

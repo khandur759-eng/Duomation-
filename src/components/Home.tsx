@@ -191,16 +191,21 @@ export const Home: React.FC<HomeProps> = ({
               {recentProjects.map((proj) => (
                 <div
                   key={proj.id}
-                  onClick={() => onOpenProject(proj.id)}
+                  
                   className="group relative p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-indigo-500/50 hover:bg-slate-900 cursor-pointer transition-all flex items-center justify-between"
                 >
-                  <div className="space-y-1 truncate pr-2">
+                  <div
+  className="flex-1 min-w-0 cursor-pointer"
+  onClick={() => onOpenProject(proj.id)}
+>
+  <div className="space-y-1 truncate pr-2">
                     <h4 className="text-sm font-semibold text-slate-200 group-hover:text-white truncate">
                       {proj.name}
                     </h4>
                     <p className="text-[11px] text-slate-500 font-mono">
                       {proj.frameCount} frame(s) • {new Date(proj.updatedAt).toLocaleDateString()}
                     </p>
+</div>
                   </div>
 
                   <button

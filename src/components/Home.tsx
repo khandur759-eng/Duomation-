@@ -67,7 +67,7 @@ export const Home: React.FC<HomeProps> = ({
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 text-slate-100 flex flex-col justify-between p-6 md:p-12 selection:bg-indigo-500 selection:text-white">
+    <div className="h-screen w-full overflow-y-auto overflow-x-hidden bg-slate-950 text-slate-100 flex flex-col p-6 md:p-12 selection:bg-indigo-500 selection:text-white">
       <div className="max-w-4xl mx-auto w-full space-y-12">
         {/* Header */}
         <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

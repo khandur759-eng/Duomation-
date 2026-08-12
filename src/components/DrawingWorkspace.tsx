@@ -966,7 +966,21 @@ const [canvasRotation, setCanvasRotation] = useState<0 | 90>(0);
 
         {/* Right: Undo/Redo & Export */}
         <div className="flex items-center gap-1 sm:gap-1.5">
-          <button
+
+ <button
+  onClick={() =>
+    setCanvasRotation((prev) => (prev === 0 ? 90 : 0))
+  }
+  className="p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all"
+  title="Rotate Canvas"
+  aria-label="Rotate Canvas"
+>
+  <RotateCw
+    className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-500 ${
+      canvasRotation === 90 ? 'rotate-90' : 'rotate-0'
+    }`}
+  />
+</button>         <button
             onClick={handleUndo}
             disabled={undoStack.length === 0}
             className="p-1.5 sm:p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 disabled:opacity-30 transition-colors"

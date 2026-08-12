@@ -220,6 +220,221 @@ export const Home: React.FC<HomeProps> = ({
             </div>
           )}
         </section>
+{/* SEO & Product Information */}
+<section className="space-y-10 pt-8 border-t border-slate-900">
+
+  {/* Main Description */}
+  <div className="space-y-4">
+    <span className="inline-flex items-center px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold">
+      Dual-Device Creative Workspace
+    </span>
+
+    <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+      Connect Two Devices. Create as One.
+    </h2>
+
+    <p className="text-sm sm:text-base leading-7 text-slate-400 max-w-3xl">
+      Duomation is a dual-device creative workspace designed to connect two
+      devices into one synchronized animation workflow. Use one device as
+      your drawing and animation controller while another device becomes a
+      dedicated display screen. Duomation brings both screens together so
+      you can create, preview, and work with animations across devices
+      directly in your browser.
+    </p>
+  </div>
+
+  {/* Dual Device Workflow */}
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+    <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800">
+      <div className="flex items-center gap-3 mb-4">
+        <Smartphone className="w-5 h-5 text-indigo-400" />
+        <h3 className="text-lg font-semibold text-white">
+          Device A — Create
+        </h3>
+      </div>
+
+      <p className="text-sm leading-6 text-slate-400">
+        Use your primary device as a drawing and animation workspace.
+        Create frames, draw your artwork, edit your animation timeline,
+        manage layers, and control your animation from one screen.
+      </p>
+    </div>
+
+    <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800">
+      <div className="flex items-center gap-3 mb-4">
+        <Monitor className="w-5 h-5 text-indigo-400" />
+        <h3 className="text-lg font-semibold text-white">
+          Device B — Display
+        </h3>
+      </div>
+
+      <p className="text-sm leading-6 text-slate-400">
+        Connect a second device as a live animation display. Your animation
+        workspace can stay on one device while the second screen provides a
+        dedicated view of the animation.
+      </p>
+    </div>
+
+  </div>
+
+  {/* How It Works */}
+  <div className="space-y-5">
+    <h2 className="text-2xl font-bold text-white">
+      How Duomation Works
+    </h2>
+
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+      <div className="p-5 rounded-xl bg-slate-900/40 border border-slate-800">
+        <div className="text-indigo-400 font-bold text-sm mb-2">
+          01 — Connect
+        </div>
+        <h3 className="text-base font-semibold text-white mb-2">
+          Connect Two Devices
+        </h3>
+        <p className="text-sm leading-6 text-slate-500">
+          Pair your devices using the Duomation connection system and
+          establish a synchronized workspace.
+        </p>
+      </div>
+
+      <div className="p-5 rounded-xl bg-slate-900/40 border border-slate-800">
+        <div className="text-indigo-400 font-bold text-sm mb-2">
+          02 — Create
+        </div>
+        <h3 className="text-base font-semibold text-white mb-2">
+          Draw and Animate
+        </h3>
+        <p className="text-sm leading-6 text-slate-500">
+          Create frame-by-frame animations using the drawing workspace,
+          timeline, layers, and animation tools.
+        </p>
+      </div>
+
+      <div className="p-5 rounded-xl bg-slate-900/40 border border-slate-800">
+        <div className="text-indigo-400 font-bold text-sm mb-2">
+          03 — Experience
+        </div>
+        <h3 className="text-base font-semibold text-white mb-2">
+          Use Both Screens
+        </h3>
+        <p className="text-sm leading-6 text-slate-500">
+          Keep your creative controls on one device while using another
+          screen as your dedicated animation display.
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  {/* What Duomation Is */}
+  <div className="space-y-4">
+    <h2 className="text-2xl font-bold text-white">
+      What Is Duomation?
+    </h2>
+
+    <p className="text-sm sm:text-base leading-7 text-slate-400 max-w-3xl">
+      Duomation is a browser-based dual-device animation platform that
+      connects multiple screens into a synchronized creative workflow.
+      Its main purpose is to make two-device animation more practical by
+      separating creation and display across connected devices.
+    </p>
+
+    <p className="text-sm sm:text-base leading-7 text-slate-400 max-w-3xl">
+      It combines cross-device connectivity with digital drawing and
+      frame-by-frame animation, giving creators a flexible workspace without
+      requiring traditional desktop animation software.
+    </p>
+  </div>
+
+  {/* Use Cases */}
+  <div className="space-y-5">
+    <h2 className="text-2xl font-bold text-white">
+      What Can You Use Duomation For?
+    </h2>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+      {[
+        "Dual-device animation workflows",
+        "Frame-by-frame 2D animation",
+        "Drawing animations in a browser",
+        "Using a second device as an animation display",
+        "Creating animations across connected screens",
+        "Digital drawing and animation projects",
+        "Previewing animation on a separate screen",
+        "Portable animation workflows",
+      ].map((item) => (
+        <div
+          key={item}
+          className="flex items-center gap-3 p-4 rounded-xl bg-slate-900/40 border border-slate-800"
+        >
+          <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0" />
+          <span className="text-sm text-slate-300">
+            {item}
+          </span>
+        </div>
+      ))}
+
+    </div>
+  </div>
+
+  {/* FAQ */}
+  <div className="space-y-5">
+    <h2 className="text-2xl font-bold text-white">
+      Frequently Asked Questions
+    </h2>
+
+    <div className="space-y-3">
+
+      <details className="group p-5 rounded-xl bg-slate-900/40 border border-slate-800">
+        <summary className="cursor-pointer text-sm font-semibold text-white">
+          What is Duomation?
+        </summary>
+        <p className="mt-3 text-sm leading-6 text-slate-400">
+          Duomation is a dual-device creative workspace that connects two
+          devices into a synchronized animation workflow.
+        </p>
+      </details>
+
+      <details className="group p-5 rounded-xl bg-slate-900/40 border border-slate-800">
+        <summary className="cursor-pointer text-sm font-semibold text-white">
+          Can I use two devices with Duomation?
+        </summary>
+        <p className="mt-3 text-sm leading-6 text-slate-400">
+          Yes. One device can be used as the drawing and animation workspace
+          while another connected device can act as a dedicated display.
+        </p>
+      </details>
+
+      <details className="group p-5 rounded-xl bg-slate-900/40 border border-slate-800">
+        <summary className="cursor-pointer text-sm font-semibold text-white">
+          Is Duomation an animation tool?
+        </summary>
+        <p className="mt-3 text-sm leading-6 text-slate-400">
+          Yes. Duomation provides a frame-by-frame animation workspace, but
+          its defining feature is the ability to connect two devices into
+          one animation workflow.
+        </p>
+      </details>
+
+      <details className="group p-5 rounded-xl bg-slate-900/40 border border-slate-800">
+        <summary className="cursor-pointer text-sm font-semibold text-white">
+          Does Duomation work in a browser?
+        </summary>
+        <p className="mt-3 text-sm leading-6 text-slate-400">
+          Duomation is designed as a browser-based creative workspace, so
+          you can access the application from compatible devices without
+          installing traditional desktop animation software.
+        </p>
+      </details>
+
+    </div>
+  </div>
+
+</section>
+
       </div>
 
       <footer className="text-center text-xs text-slate-600 mt-12 font-mono">

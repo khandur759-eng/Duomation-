@@ -104,23 +104,121 @@ export function drawStroke(
     return;
   }
 
+  // Default / Freehand curve rendering helper
+  const renderFreehandCurve = (
+    strokeLineWidth: number,
+    variablePressure: boolean = true
+  ) => {
+    if (pts.length === 1) {
+      const p = pts[0];
+      const pressure = p.pressure !== undefined ? p.pressure : 0.5;
+      const r = strokeLineWidth * (variablePressure ? 0.4 + pressure * 0.8 : 1);
+      ctx.beginPath();
+      ctx.arc(p.x * canvasWidth, p.y * canvasHeight, Math.max(0.5, r / 2), 0, 2 * Math.PI);
+      ctx.fill();
+      return;
+    }
+
+    if (pts.length === 2) {
+      const p1 = pts[0];
+      const p2 = pts[1];
+      const pressure = p2.pressure !== undefined ? p2.pressure : 0.5;
+      ctx.lineWidth = strokeLineWidth * (variablePressure ? 0.4 + pressure * 0.8 : 1);
+      ctx.beginPath();
+      ctx.moveTo(p1.x * canvasWidth, p1.y * canvasHeight);
+      ctx.lineTo(p2.x * canvasWidth, p2.y * canvasHeight);
+      ctx.stroke();
+      return;
+    }
+
+    // Check if pressure varies across points
+    const hasPressureVariation = variablePressure && pts.some((p) => p.pressure !== undefined && Math.abs(p.pressure - 0.5) > 0.05);
+
+    if (!hasPressureVariation) {
+      // High-performance single path quadratic curve smoothing
+      ctx.lineWidth = strokeLineWidth;
+      ctx.beginPath();
+      const p0 = pts[0];
+      const p1 = pts[1];
+      ctx.moveTo(p0.x * canvasWidth, p0.y * canvasHeight);
+
+      let midX = ((p0.x + p1.x) / 2) * canvasWidth;
+      let midY = ((p0.y + p1.y) / 2) * canvasHeight;
+      ctx.lineTo(midX, midY);
+
+      for (let i = 1; i < pts.length - 1; i++) {
+        const curr = pts[i];
+        const next = pts[i + 1];
+        const nextMidX = ((curr.x + next.x) / 2) * canvasWidth;
+        const nextMidY = ((curr.y + next.y) / 2) * canvasHeight;
+        ctx.quadraticCurveTo(
+          curr.x * canvasWidth,
+          curr.y * canvasHeight,
+          nextMidX,
+          nextMidY
+        );
+      }
+
+      const last = pts[pts.length - 1];
+      ctx.lineTo(last.x * canvasWidth, last.y * canvasHeight);
+      ctx.stroke();
+    } else {
+      // Segment-by-segment smooth curve with pressure-varying stroke width
+      let prevMidX = ((pts[0].x + pts[1].x) / 2) * canvasWidth;
+      let prevMidY = ((pts[0].y + pts[1].y) / 2) * canvasHeight;
+
+      // Draw initial segment
+      const p0Press = pts[0].pressure !== undefined ? pts[0].pressure : 0.5;
+      ctx.lineWidth = Math.max(1, strokeLineWidth * (0.4 + p0Press * 0.8));
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x * canvasWidth, pts[0].y * canvasHeight);
+      ctx.lineTo(prevMidX, prevMidY);
+      ctx.stroke();
+
+      for (let i = 1; i < pts.length - 1; i++) {
+        const curr = pts[i];
+        const next = pts[i + 1];
+        const nextMidX = ((curr.x + next.x) / 2) * canvasWidth;
+        const nextMidY = ((curr.y + next.y) / 2) * canvasHeight;
+
+        const pPress = curr.pressure !== undefined ? curr.pressure : 0.5;
+        ctx.lineWidth = Math.max(1, strokeLineWidth * (0.4 + pPress * 0.8));
+        ctx.beginPath();
+        ctx.moveTo(prevMidX, prevMidY);
+        ctx.quadraticCurveTo(
+          curr.x * canvasWidth,
+          curr.y * canvasHeight,
+          nextMidX,
+          nextMidY
+        );
+        ctx.stroke();
+
+        prevMidX = nextMidX;
+        prevMidY = nextMidY;
+      }
+
+      // Draw final segment
+      const lastPress = pts[pts.length - 1].pressure !== undefined ? pts[pts.length - 1].pressure : 0.5;
+      ctx.lineWidth = Math.max(1, strokeLineWidth * (0.4 + lastPress * 0.8));
+      ctx.beginPath();
+      ctx.moveTo(prevMidX, prevMidY);
+      ctx.lineTo(pts[pts.length - 1].x * canvasWidth, pts[pts.length - 1].y * canvasHeight);
+      ctx.stroke();
+    }
+  };
+
   // Handle Marker / Highlighter tool (Translucent Broad Marker)
   if (stroke.tool === 'marker') {
     ctx.globalAlpha = Math.min(strokeOpacity, 0.4);
     ctx.lineCap = 'square';
     ctx.lineJoin = 'miter';
-    ctx.lineWidth = baseWidth * 2.2;
+    const markerWidth = baseWidth * 2.2;
 
     if (pts.length === 1) {
       const p = pts[0];
-      ctx.fillRect(p.x * canvasWidth - baseWidth, p.y * canvasHeight - baseWidth, baseWidth * 2, baseWidth * 2);
+      ctx.fillRect(p.x * canvasWidth - markerWidth / 2, p.y * canvasHeight - markerWidth / 2, markerWidth, markerWidth);
     } else {
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x * canvasWidth, pts[0].y * canvasHeight);
-      for (let i = 1; i < pts.length; i++) {
-        ctx.lineTo(pts[i].x * canvasWidth, pts[i].y * canvasHeight);
-      }
-      ctx.stroke();
+      renderFreehandCurve(markerWidth, false);
     }
     ctx.restore();
     return;
@@ -256,33 +354,12 @@ export function drawStroke(
 
   // Handle Paint Brush (Painterly Soft Stroke)
   if (stroke.tool === 'brush') {
-    ctx.globalAlpha = strokeOpacity * 0.6;
+    ctx.globalAlpha = strokeOpacity * 0.75;
     ctx.shadowColor = stroke.color;
-    ctx.shadowBlur = baseWidth * 0.25;
+    ctx.shadowBlur = baseWidth * 0.2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-
-    if (pts.length === 1) {
-      const p = pts[0];
-      const pressure = p.pressure !== undefined ? p.pressure : 0.5;
-      const r = baseWidth * (0.4 + pressure * 0.8);
-      ctx.beginPath();
-      ctx.arc(p.x * canvasWidth, p.y * canvasHeight, Math.max(1, r / 2), 0, 2 * Math.PI);
-      ctx.fill();
-    } else {
-      for (let i = 1; i < pts.length; i++) {
-        const prev = pts[i - 1];
-        const curr = pts[i];
-        const pressure = curr.pressure !== undefined ? curr.pressure : 0.5;
-        const segWidth = Math.max(1, baseWidth * (0.4 + pressure * 0.8));
-
-        ctx.lineWidth = segWidth;
-        ctx.beginPath();
-        ctx.moveTo(prev.x * canvasWidth, prev.y * canvasHeight);
-        ctx.lineTo(curr.x * canvasWidth, curr.y * canvasHeight);
-        ctx.stroke();
-      }
-    }
+    renderFreehandCurve(baseWidth, true);
     ctx.restore();
     return;
   }
@@ -292,28 +369,16 @@ export function drawStroke(
     ctx.globalAlpha = strokeOpacity * 0.88;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    renderFreehandCurve(baseWidth * 0.6, true);
+    ctx.restore();
+    return;
+  }
 
-    if (pts.length === 1) {
-      const p = pts[0];
-      const pressure = p.pressure !== undefined ? p.pressure : 0.5;
-      const r = baseWidth * 0.55 * (0.4 + pressure * 0.7);
-      ctx.beginPath();
-      ctx.arc(p.x * canvasWidth, p.y * canvasHeight, Math.max(1, r / 2), 0, 2 * Math.PI);
-      ctx.fill();
-    } else {
-      for (let i = 1; i < pts.length; i++) {
-        const prev = pts[i - 1];
-        const curr = pts[i];
-        const pressure = curr.pressure !== undefined ? curr.pressure : 0.5;
-        const segWidth = Math.max(1, baseWidth * 0.55 * (0.4 + pressure * 0.7));
-
-        ctx.lineWidth = segWidth;
-        ctx.beginPath();
-        ctx.moveTo(prev.x * canvasWidth, prev.y * canvasHeight);
-        ctx.lineTo(curr.x * canvasWidth, curr.y * canvasHeight);
-        ctx.stroke();
-      }
-    }
+  // Handle Eraser Tool
+  if (stroke.tool === 'eraser') {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    renderFreehandCurve(baseWidth * 1.5, true);
     ctx.restore();
     return;
   }
@@ -321,28 +386,7 @@ export function drawStroke(
   // Default / Ink Pen (Clean Line Art)
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-
-  if (pts.length === 1) {
-    const p = pts[0];
-    const pressure = p.pressure !== undefined ? p.pressure : 0.5;
-    const r = baseWidth * (0.3 + pressure * 0.9);
-    ctx.beginPath();
-    ctx.arc(p.x * canvasWidth, p.y * canvasHeight, Math.max(1, r / 2), 0, 2 * Math.PI);
-    ctx.fill();
-  } else {
-    for (let i = 1; i < pts.length; i++) {
-      const prev = pts[i - 1];
-      const curr = pts[i];
-      const pressure = curr.pressure !== undefined ? curr.pressure : 0.5;
-      const segWidth = Math.max(1, baseWidth * (0.3 + pressure * 0.9));
-
-      ctx.lineWidth = segWidth;
-      ctx.beginPath();
-      ctx.moveTo(prev.x * canvasWidth, prev.y * canvasHeight);
-      ctx.lineTo(curr.x * canvasWidth, curr.y * canvasHeight);
-      ctx.stroke();
-    }
-  }
+  renderFreehandCurve(baseWidth, true);
 
   ctx.restore();
 }

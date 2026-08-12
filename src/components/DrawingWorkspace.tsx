@@ -9,6 +9,7 @@ import {
 } from '../types/animation';
 import { renderCanvasFrame, floodFill } from '../engine/renderer';
 import { stabilizePoint, simplifyPoints } from '../engine/smoothing';
+import { drawCursorOverlay, CursorPos } from '../engine/cursor';
 import { syncService } from '../services/syncService';
 import { saveProject } from '../utils/db';
 
@@ -215,17 +216,38 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     triggerAutosave(restored);
   }, [redoStack, project, triggerAutosave]);
 
-  // Wheel zoom and pan listener on container
+  // High-performance real-time drawing refs & input pipeline
+  const currentStrokePointsRef = useRef<Point[]>([]);
+  const isDrawingRef = useRef<boolean>(false);
+  const unsentPointsRef = useRef<Point[]>([]);
+  const cursorPosRef = useRef<CursorPos>({ x: 0, y: 0, visible: false });
+  const rafIdRef = useRef<number | null>(null);
+  const lastNetworkSyncTimeRef = useRef<number>(0);
+
+  // Wheel zoom and pan listener on container with focal-point cursor zooming
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      if (e.ctrlKey || e.metaKey) {
-        // Zoom towards center
-        const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-        setZoom((prev) => Math.min(5, Math.max(0.5, prev * zoomFactor)));
+      if (e.ctrlKey || e.metaKey || !e.shiftKey) {
+        // Zoom towards pointer focal point
+        const zoomFactor = e.deltaY < 0 ? 1.12 : 0.88;
+        setZoom((prevZoom) => {
+          const newZoom = Math.min(8, Math.max(0.2, prevZoom * zoomFactor));
+          if (canvasRef.current) {
+            const rect = canvasRef.current.getBoundingClientRect();
+            const offsetX = e.clientX - (rect.left + rect.width / 2);
+            const offsetY = e.clientY - (rect.top + rect.height / 2);
+            const scaleRatio = newZoom / prevZoom - 1;
+            setPan((prevPan) => ({
+              x: prevPan.x - offsetX * scaleRatio,
+              y: prevPan.y - offsetY * scaleRatio,
+            }));
+          }
+          return newZoom;
+        });
       } else {
         // Pan
         setPan((prev) => ({
@@ -346,23 +368,27 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     return () => unsubscribe();
   }, [project, activeFrameIndex]);
 
-  // Synchronize canvas rendering
+  // Synchronize canvas rendering with live cursor overlay
   const renderPass = useCallback(() => {
     if (!canvasRef.current) return;
 
-    const activeStroke: Stroke | null = isDrawing && currentStrokePoints.length > 0
-      ? {
-          id: currentStrokeIdRef.current || 'active',
-          tool: toolSettings.activeTool,
-          color: toolSettings.color,
-          size: toolSettings.size,
-          opacity: toolSettings.opacity,
-          points: currentStrokePoints,
-          layerId: activeLayerId,
-          frameId: project.frames[activeFrameIndex]?.id || 'f1',
-          timestamp: Date.now(),
-        }
-      : null;
+    const drawingActive = isDrawingRef.current || isDrawing;
+    const activePoints = isDrawingRef.current ? currentStrokePointsRef.current : currentStrokePoints;
+
+    const activeStroke: Stroke | null =
+      drawingActive && activePoints.length > 0
+        ? {
+            id: currentStrokeIdRef.current || 'active',
+            tool: toolSettings.activeTool,
+            color: toolSettings.color,
+            size: toolSettings.size,
+            opacity: toolSettings.opacity,
+            points: activePoints,
+            layerId: activeLayerId,
+            frameId: project.frames[activeFrameIndex]?.id || 'f1',
+            timestamp: Date.now(),
+          }
+        : null;
 
     renderCanvasFrame({
       canvas: canvasRef.current,
@@ -375,6 +401,12 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
       panY: pan.y,
       showOnionSkin: project.settings.onionSkin.enabled,
     });
+
+    // Draw live brush/tool cursor overlay
+    const ctx = canvasRef.current.getContext('2d');
+    if (ctx && cursorPosRef.current.visible) {
+      drawCursorOverlay(ctx, cursorPosRef.current, toolSettings, zoom, canvasRef.current);
+    }
   }, [
     project,
     activeFrameIndex,
@@ -461,10 +493,38 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     };
   }, [isPlaying, project.settings.fps, project.frames.length]);
 
-  // Pointer & Touch Handlers with Zoom, Pan, and Multi-touch Support
+  // Start continuous rAF drawing loop for 120Hz smooth local rendering
+  const startDrawingLoop = useCallback(() => {
+    if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+
+    const loop = () => {
+      // Flush unsent stroke points to socket.io network at ~80Hz
+      if (unsentPointsRef.current.length > 0 && currentStrokeIdRef.current) {
+        const now = Date.now();
+        if (now - lastNetworkSyncTimeRef.current >= 12) {
+          const batch = [...unsentPointsRef.current];
+          unsentPointsRef.current = [];
+          syncService.sendStrokePoints(currentStrokeIdRef.current, batch);
+          lastNetworkSyncTimeRef.current = now;
+        }
+      }
+
+      renderPass();
+
+      if (isDrawingRef.current) {
+        rafIdRef.current = requestAnimationFrame(loop);
+      }
+    };
+
+    rafIdRef.current = requestAnimationFrame(loop);
+  }, [renderPass]);
+
+  // Pointer & Touch Handlers with Zero-Latency Ref Drawing, Coalesced Events, Zoom & Pan
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (isPlaying) setIsPlaying(false);
     if (!canvasRef.current) return;
+
+    cursorPosRef.current = { x: e.clientX, y: e.clientY, visible: true };
 
     // Track active pointer for pinch-zoom
     activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -479,7 +539,9 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
 
     // Two-finger pinch gesture detected
     if (activePointersRef.current.size >= 2) {
+      isDrawingRef.current = false;
       setIsDrawing(false);
+      currentStrokePointsRef.current = [];
       setCurrentStrokePoints([]);
       const pts = Array.from(activePointersRef.current.values()) as { x: number; y: number }[];
       const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
@@ -550,11 +612,16 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     }
 
     pushUndo(project);
-    setIsDrawing(true);
 
     const strokeId = 'st_' + Math.random().toString(36).substring(2, 9);
     currentStrokeIdRef.current = strokeId;
-    setCurrentStrokePoints([initialPoint]);
+    currentStrokePointsRef.current = [initialPoint];
+    unsentPointsRef.current = [initialPoint];
+    isDrawingRef.current = true;
+    setIsDrawing(true);
+
+    // Start drawing loop
+    startDrawingLoop();
 
     // Broadcast stroke-start
     syncService.sendStrokeStart({
@@ -570,6 +637,8 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    cursorPosRef.current = { x: e.clientX, y: e.clientY, visible: true };
+
     // Update active pointer position
     if (activePointersRef.current.has(e.pointerId)) {
       activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -581,6 +650,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
       const dy = e.clientY - lastPanPosRef.current.y;
       setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
       lastPanPosRef.current = { x: e.clientX, y: e.clientY };
+      renderPass();
       return;
     }
 
@@ -589,26 +659,39 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
       const pts = Array.from(activePointersRef.current.values()) as { x: number; y: number }[];
       const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       const scale = currentDist / initialPinchDistRef.current;
-      const newZoom = Math.min(5, Math.max(0.5, initialZoomRef.current * scale));
+      const newZoom = Math.min(8, Math.max(0.2, initialZoomRef.current * scale));
       setZoom(newZoom);
+      renderPass();
       return;
     }
 
-    if (!isDrawing || !canvasRef.current) return;
+    if (!isDrawingRef.current || !canvasRef.current) {
+      renderPass();
+      return;
+    }
 
-    const pressure = e.pressure && e.pressure > 0 ? e.pressure : 0.5;
-    const rawPoint = getNormalizedPoint(e.clientX, e.clientY, pressure);
-    const smoothedPoint = stabilizePoint(rawPoint, currentStrokePoints, toolSettings.stabilizer);
+    // Extract sub-frame coalesced pointer events if supported
+    const nativeEvt = e.nativeEvent as any;
+    const coalescedEvents: PointerEvent[] =
+      nativeEvt && typeof nativeEvt.getCoalescedEvents === 'function'
+        ? nativeEvt.getCoalescedEvents()
+        : [nativeEvt || e];
 
-    setCurrentStrokePoints((prev) => {
-      const next = [...prev, smoothedPoint];
-      // Send real-time points batch to socket
-      syncService.sendStrokePoints(currentStrokeIdRef.current || '', [smoothedPoint]);
-      return next;
-    });
+    for (const cev of coalescedEvents) {
+      const pressure = cev.pressure && cev.pressure > 0 ? cev.pressure : 0.5;
+      const rawPoint = getNormalizedPoint(cev.clientX, cev.clientY, pressure);
+      const smoothedPoint = stabilizePoint(
+        rawPoint,
+        currentStrokePointsRef.current,
+        toolSettings.stabilizer
+      );
+      currentStrokePointsRef.current.push(smoothedPoint);
+      unsentPointsRef.current.push(smoothedPoint);
+    }
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    cursorPosRef.current = { x: e.clientX, y: e.clientY, visible: false };
     activePointersRef.current.delete(e.pointerId);
 
     if (isPanningRef.current) {
@@ -619,61 +702,90 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
       initialPinchDistRef.current = null;
     }
 
-    if (!isDrawing) return;
+    if (!isDrawingRef.current) {
+      renderPass();
+      return;
+    }
 
     if (canvasRef.current && canvasRef.current.hasPointerCapture(e.pointerId)) {
       canvasRef.current.releasePointerCapture(e.pointerId);
     }
 
-    setIsDrawing(false);
-
-    if (currentStrokePoints.length === 0) return;
-
-    // Simplify completed stroke or lock shape points
-    let finalPoints: Point[] = [];
-    if (
-      toolSettings.activeTool === 'line' ||
-      toolSettings.activeTool === 'rectangle' ||
-      toolSettings.activeTool === 'ellipse'
-    ) {
-      finalPoints = [
-        currentStrokePoints[0],
-        currentStrokePoints[currentStrokePoints.length - 1],
-      ];
-    } else {
-      finalPoints = simplifyPoints(currentStrokePoints, 0.0003);
+    isDrawingRef.current = false;
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
     }
 
-    const newStroke: Stroke = {
-      id: currentStrokeIdRef.current || 'st_' + Date.now(),
-      tool: toolSettings.activeTool,
-      color: toolSettings.color,
-      size: toolSettings.size,
-      opacity: toolSettings.opacity,
-      points: finalPoints,
-      layerId: activeLayerId,
-      frameId: project.frames[activeFrameIndex]?.id || 'f1',
-      timestamp: Date.now(),
-    };
+    // Flush remaining unsent points to socket
+    if (unsentPointsRef.current.length > 0 && currentStrokeIdRef.current) {
+      syncService.sendStrokePoints(currentStrokeIdRef.current, unsentPointsRef.current);
+      unsentPointsRef.current = [];
+    }
 
-    const key = `${activeLayerId}:${project.frames[activeFrameIndex]?.id}`;
-    
-    commitMutation((prev) => {
-      const existingStrokes = prev.layerFrames[key] || [];
-      return {
-        ...prev,
-        layerFrames: {
-          ...prev.layerFrames,
-          [key]: [...existingStrokes, newStroke],
-        },
+    const points = currentStrokePointsRef.current;
+    if (points.length > 0) {
+      // Simplify completed stroke or lock shape points
+      let finalPoints: Point[] = [];
+      if (
+        toolSettings.activeTool === 'line' ||
+        toolSettings.activeTool === 'rectangle' ||
+        toolSettings.activeTool === 'ellipse'
+      ) {
+        finalPoints = [
+          points[0],
+          points[points.length - 1],
+        ];
+      } else {
+        finalPoints = simplifyPoints(points, 0.0003);
+      }
+
+      const newStroke: Stroke = {
+        id: currentStrokeIdRef.current || 'st_' + Date.now(),
+        tool: toolSettings.activeTool,
+        color: toolSettings.color,
+        size: toolSettings.size,
+        opacity: toolSettings.opacity,
+        points: finalPoints,
+        layerId: activeLayerId,
+        frameId: project.frames[activeFrameIndex]?.id || 'f1',
+        timestamp: Date.now(),
       };
-    });
 
-    setCurrentStrokePoints([]);
+      const key = `${activeLayerId}:${project.frames[activeFrameIndex]?.id}`;
+
+      commitMutation((prev) => {
+        const existingStrokes = prev.layerFrames[key] || [];
+        return {
+          ...prev,
+          layerFrames: {
+            ...prev.layerFrames,
+            [key]: [...existingStrokes, newStroke],
+          },
+        };
+      });
+
+      // Sync stroke end event
+      syncService.sendStrokeEnd(newStroke);
+    }
+
+    currentStrokePointsRef.current = [];
     currentStrokeIdRef.current = null;
+    setIsDrawing(false);
+    setCurrentStrokePoints([]);
+    renderPass();
+  };
 
-    // Sync stroke end event
-    syncService.sendStrokeEnd(newStroke);
+  const handlePointerEnter = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    cursorPosRef.current = { x: e.clientX, y: e.clientY, visible: true };
+    renderPass();
+  };
+
+  const handlePointerLeave = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    cursorPosRef.current = { x: e.clientX, y: e.clientY, visible: false };
+    if (!isDrawingRef.current) {
+      renderPass();
+    }
   };
 
 
@@ -1123,6 +1235,8 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
+            onPointerEnter={handlePointerEnter}
+            onPointerLeave={handlePointerLeave}
             className="w-full h-full object-contain touch-none cursor-crosshair shadow-2xl rounded-lg"
           />
         </div>

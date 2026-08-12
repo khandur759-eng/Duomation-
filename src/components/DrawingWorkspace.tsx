@@ -343,7 +343,41 @@ const [canvasRotation, setCanvasRotation] = useState<0 | 90>(0);
   }, [handleUndo, handleRedo, showToast]);
 
   // Convert client pixel position into normalized [0..1] canvas point considering Pan and Zoom
-  const getNormalizedPoint = useCallback((clientX: number, clientY: number, pressureVal: number = 0.5): Point => {
+const getNormalizedPoint = useCallback(
+  (clientX: number, clientY: number, pressureVal: number = 0.5): Point => {
+    if (!canvasRef.current) {
+      return { x: 0, y: 0, pressure: pressureVal };
+    }
+
+    const rect = canvasRef.current.getBoundingClientRect();
+
+    let rawX = (clientX - rect.left) / rect.width;
+    let rawY = (clientY - rect.top) / rect.height;
+
+    // Undo the visual canvas rotation before converting
+    // the pointer position into canvas coordinates.
+    if (canvasRotation === 90) {
+      const rotatedX = rawX;
+      const rotatedY = rawY;
+
+      rawX = rotatedY;
+      rawY = 1 - rotatedX;
+    }
+
+    const normX =
+      (rawX - 0.5 - pan.x / rect.width) / zoom + 0.5;
+
+    const normY =
+      (rawY - 0.5 - pan.y / rect.height) / zoom + 0.5;
+
+    return {
+      x: Math.max(0, Math.min(1, normX)),
+      y: Math.max(0, Math.min(1, normY)),
+      pressure: pressureVal,
+    };
+  },
+  [zoom, pan, canvasRotation]
+);
     if (!canvasRef.current) return { x: 0, y: 0, pressure: pressureVal };
     const rect = canvasRef.current.getBoundingClientRect();
     const rawX = (clientX - rect.left) / rect.width;

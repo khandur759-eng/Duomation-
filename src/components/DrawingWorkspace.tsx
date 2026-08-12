@@ -24,6 +24,7 @@ import {
   Pencil,
   PenTool,
   Paintbrush,
+  RotateCw,
   Eraser,
   PaintBucket,
   Minus,

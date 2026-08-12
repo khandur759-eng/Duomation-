@@ -81,7 +81,7 @@ export const Home: React.FC<HomeProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-2">
             <div className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono" title={`Supabase Project ID: ${SUPABASE_PROJECT_ID}`}>
               <Database className="w-3.5 h-3.5 text-emerald-400" />
               <span>Supabase Cloud Sync</span>

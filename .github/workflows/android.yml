@@ -24,6 +24,9 @@ jobs:
         run: npm ci
 
       - name: Build web app
+        env:
+         VITE_SOCKET_URL:
+           https://duomation-server.onrender.com
         run: npm run build
 
       - name: Sync Capacitor

@@ -53,7 +53,7 @@ export default function App() {
   // Action: Create New Animation (Device A Drawing)
   const handleCreateNewProject = async () => {
     try {
-      const project = createNewProject('My 2D Animation');
+      const project = createNewProject('Duomation');
       setCurrentProject(project);
       setMode('draw');
 

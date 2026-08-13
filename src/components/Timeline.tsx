@@ -8,6 +8,8 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Eye,
   EyeOff,
   Layers,
@@ -27,8 +29,11 @@ interface TimelineProps {
   onTogglePlay: () => void;
   onChangeFps: (fps: number) => void;
   onToggleOnionSkin: () => void;
+  onChangeOnionSkinSettings?: (settings: Partial<OnionSkinSettings>) => void;
   onOpenOnionSettings: () => void;
   onOpenLayers: () => void;
+  isMinimized?: boolean;
+  onToggleMinimize?: () => void;
 }
 
 export const Timeline: React.FC<TimelineProps> = ({
@@ -42,8 +47,11 @@ export const Timeline: React.FC<TimelineProps> = ({
   onTogglePlay,
   onChangeFps,
   onToggleOnionSkin,
+  onChangeOnionSkinSettings,
   onOpenOnionSettings,
   onOpenLayers,
+  isMinimized = false,
+  onToggleMinimize,
 }) => {
   const frames = project.frames;
   const fps = project.settings.fps || 12;
@@ -64,6 +72,46 @@ export const Timeline: React.FC<TimelineProps> = ({
       onSelectFrame(0);
     }
   };
+
+  if (isMinimized) {
+    return (
+      <div className="w-full bg-slate-900 border-t border-slate-800 text-slate-200 select-none px-3 py-1.5 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onTogglePlay}
+            title={isPlaying ? 'Pause' : 'Play'}
+            className={`p-1.5 rounded-lg font-medium transition-all active:scale-95 ${
+              isPlaying
+                ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-md shadow-indigo-600/20'
+            }`}
+          >
+            {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+          </button>
+
+          <span className="text-[11px] font-mono text-slate-300">
+            Frame <span className="text-indigo-400 font-bold">{activeFrameIndex + 1}</span> / {frames.length}
+          </span>
+
+          <div className="h-3 w-px bg-slate-800 mx-0.5" />
+
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800/80 text-slate-400 font-semibold">
+            {fps} FPS
+          </span>
+        </div>
+
+        <button
+          onClick={onToggleMinimize}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors text-[11px] font-semibold border border-slate-700/60 shadow-sm"
+          title="Expand Timeline Panel"
+        >
+          <Layers className="w-3.5 h-3.5 text-indigo-400" />
+          <span>Timeline</span>
+          <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full bg-slate-900 border-t border-slate-800 text-slate-200 select-none flex flex-col">
@@ -120,7 +168,7 @@ export const Timeline: React.FC<TimelineProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Onion Skin Quick Toggle */}
+          {/* Onion Skin Quick Toggle & Frame Count Selector */}
           <div className="flex items-center rounded-lg bg-slate-800/80 p-0.5 border border-slate-700/50">
             <button
               onClick={onToggleOnionSkin}
@@ -134,10 +182,30 @@ export const Timeline: React.FC<TimelineProps> = ({
               {onionSkin.enabled ? <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <EyeOff className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
               <span className="hidden xs:inline">Onion</span>
             </button>
+
+            {/* Quick Frame Count Selector directly inside the tool */}
+            {onChangeOnionSkinSettings && (
+              <select
+                value={onionSkin.prevFrames}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  onChangeOnionSkinSettings({ prevFrames: val, nextFrames: Math.min(val, 3) });
+                }}
+                className="bg-transparent text-indigo-300 font-mono text-[10px] sm:text-[11px] font-bold px-1 py-0.5 focus:outline-none cursor-pointer border-l border-slate-700/60 ml-0.5"
+                title="Number of Onion Skin Frames"
+              >
+                <option value={1} className="bg-slate-900 text-slate-200">1 frame</option>
+                <option value={2} className="bg-slate-900 text-slate-200">2 frames</option>
+                <option value={3} className="bg-slate-900 text-slate-200">3 frames</option>
+                <option value={4} className="bg-slate-900 text-slate-200">4 frames</option>
+                <option value={5} className="bg-slate-900 text-slate-200">5 frames</option>
+              </select>
+            )}
+
             <button
               onClick={onOpenOnionSettings}
               className="p-1 text-slate-400 hover:text-white rounded transition-colors"
-              title="Onion Skin Settings"
+              title="Detailed Onion Skin Settings"
             >
               <Settings2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             </button>
@@ -153,6 +221,16 @@ export const Timeline: React.FC<TimelineProps> = ({
               {project.layers.length}
             </span>
           </button>
+
+          {onToggleMinimize && (
+            <button
+              onClick={onToggleMinimize}
+              className="p-1 sm:p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              title="Minimize Timeline"
+            >
+              <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
+          )}
         </div>
       </div>
 

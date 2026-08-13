@@ -19,6 +19,7 @@ import { PairingModal } from './PairingModal';
 import { ExportModal } from './ExportModal';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { ColorPickerModal } from './ColorPickerModal';
+import { OnionSkinModal } from './OnionSkinModal';
 
 import {
   Pencil,
@@ -40,6 +41,7 @@ import {
   Eye,
   Check,
   ChevronDown,
+  ChevronLeft,
   Highlighter,
   Sparkles,
   Feather,
@@ -50,6 +52,8 @@ import {
   ChevronRight,
   Wrench,
   RotateCw,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 
 interface DrawingWorkspaceProps {
@@ -90,6 +94,11 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   const [isOnionSettingsOpen, setIsOnionSettingsOpen] = useState<boolean>(false);
   const [isColorPickerOpen, setIsColorPickerOpen] = useState<boolean>(false);
   const [isMobileToolsOpen, setIsMobileToolsOpen] = useState<boolean>(false);
+  const [isFullScreenCanvas, setIsFullScreenCanvas] = useState<boolean>(false);
+  const [isLeftToolsMinimized, setIsLeftToolsMinimized] = useState<boolean>(false);
+  const [isBrushAdjustMinimized, setIsBrushAdjustMinimized] = useState<boolean>(false);
+  const [isZoomPanelMinimized, setIsZoomPanelMinimized] = useState<boolean>(false);
+  const [isTimelineMinimized, setIsTimelineMinimized] = useState<boolean>(false);
 
   const [savedPalette, setSavedPalette] = useState<string[]>(() => {
     try {
@@ -306,10 +315,21 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
         setIsPairingOpen(false);
         setIsExportOpen(false);
         setIsOnionSettingsOpen(false);
+        setIsFullScreenCanvas(false);
         return;
       }
 
       const key = e.key.toLowerCase();
+
+      if ((e.shiftKey || e.altKey) && key === 'f') {
+        e.preventDefault();
+        setIsFullScreenCanvas((prev) => {
+          const next = !prev;
+          showToast(next ? 'Entered Full-Screen Canvas Mode' : 'Exited Full-Screen Canvas Mode');
+          return next;
+        });
+        return;
+      }
       const toolMap: Record<string, { tool: ToolType; label: string }> = {
         b: { tool: 'brush', label: 'Paint Brush' },
         p: { tool: 'pencil', label: 'Pencil' },
@@ -964,161 +984,267 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
       )}
 
       {/* Top Header Bar */}
-      <header className="h-10 sm:h-14 landscape:h-10 px-2 sm:px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between z-20">
-        {/* Left: Home & Title */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <button
-            onClick={onReturnHome}
-            className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            title="Return to Home"
-          >
-            <Home className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
+      {!isFullScreenCanvas && (
+        <header className="h-12 sm:h-14 px-3 sm:px-6 bg-slate-900 border-b border-slate-800/90 flex items-center justify-between z-20 gap-4">
+          {/* Left: Home Icon + QR Code / Pair Screen Tool right next to it */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={onReturnHome}
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
+              title="Return to Home"
+            >
+              <Home className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
 
-          <input
-            type="text"
-            value={project.name}
-            onChange={(e) => {
-              const updated = { ...project, name: e.target.value };
-              setProject(updated);
-              triggerAutosave(updated);
-            }}
-            className="bg-transparent text-xs sm:text-sm font-semibold text-white hover:bg-slate-800/60 focus:bg-slate-800 px-2 py-1 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[120px] sm:max-w-[220px] truncate"
-          />
-        </div>
+            {/* QR Code / Pair Screen Tool next to Home */}
+            <button
+              onClick={() => setIsPairingOpen(true)}
+              className={`flex items-center gap-2 py-1.5 px-3 sm:px-3.5 rounded-xl text-xs font-semibold shadow-sm transition-all active:scale-95 ${
+                sessionState.hasDisplayDevice
+                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-600/20'
+              }`}
+              title="Pair Screen / QR Code"
+            >
+              <QrCode className="w-4 h-4" />
+              <span className="hidden sm:inline font-medium">
+                {sessionState.hasDisplayDevice ? 'Display Live' : 'Pair Screen'}
+              </span>
+              <span className="sm:hidden font-medium">
+                {sessionState.hasDisplayDevice ? 'Live' : 'Pair'}
+              </span>
+            </button>
+          </div>
 
-        {/* Center: Pair Device Status CTA */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsPairingOpen(true)}
-            className={`flex items-center gap-1.5 py-1 px-2.5 sm:py-1.5 sm:px-3 rounded-xl text-[11px] sm:text-xs font-semibold shadow-md transition-all active:scale-95 ${
-              sessionState.hasDisplayDevice
-                ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-600/20'
-            }`}
-          >
-            <QrCode className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>
-              {sessionState.hasDisplayDevice ? 'Display Live' : 'Pair Screen'}
-            </span>
-          </button>
-        </div>
+          {/* Right: Undo/Redo, Export, Canvas Rotation, Fullscreen & Diagnostics */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Undo / Redo Group */}
+            <div className="flex items-center bg-slate-950/60 border border-slate-800/80 rounded-xl p-0.5">
+              <button
+                onClick={handleUndo}
+                disabled={undoStack.length === 0}
+                className="p-1.5 sm:p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/80 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo2 className="w-4 h-4" />
+              </button>
 
-        {/* Right: Undo/Redo & Export */}
-        <div className="flex items-center gap-1 sm:gap-1.5">
-          <button
-            onClick={handleUndo}
-            disabled={undoStack.length === 0}
-            className="p-1.5 sm:p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 disabled:opacity-30 transition-colors"
-            title="Undo (Ctrl+Z)"
-          >
-            <Undo2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
+              <button
+                onClick={handleRedo}
+                disabled={redoStack.length === 0}
+                className="p-1.5 sm:p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/80 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                title="Redo (Ctrl+Y)"
+              >
+                <Redo2 className="w-4 h-4" />
+              </button>
+            </div>
 
-          <button
-            onClick={handleRedo}
-            disabled={redoStack.length === 0}
-            className="p-1.5 sm:p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 disabled:opacity-30 transition-colors"
-            title="Redo (Ctrl+Y)"
-          >
-            <Redo2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
+            <div className="h-4 w-px bg-slate-800 mx-0.5 sm:mx-1" />
 
-          <div className="h-4 w-px bg-slate-800 mx-0.5 sm:mx-1" />
+            <button
+              onClick={() => setIsExportOpen(true)}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors flex items-center gap-1.5 text-xs font-medium"
+              title="Export Animation"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden md:inline">Export</span>
+            </button>
 
-          <button
-            onClick={() => setIsExportOpen(true)}
-            className="p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
-            title="Export Animation"
-          >
-            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
+            <button
+              onClick={() => {
+                const nextRot = (canvasRotation + 90) % 360;
+                setCanvasRotation(nextRot);
+                showToast(nextRot === 0 ? 'Canvas Orientation: Standard' : `Canvas Rotated: ${nextRot}°`);
+              }}
+              className={`p-2 rounded-xl transition-colors flex items-center gap-1 ${
+                canvasRotation !== 0
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+              }`}
+              title="Rotate Canvas Orientation (Shift+R)"
+            >
+              <RotateCw className="w-4 h-4" />
+              {canvasRotation !== 0 && (
+                <span className="text-[10px] font-mono font-bold">{canvasRotation}°</span>
+              )}
+            </button>
 
-          <button
-            onClick={() => {
-              const nextRot = (canvasRotation + 90) % 360;
-              setCanvasRotation(nextRot);
-              showToast(nextRot === 0 ? 'Canvas Orientation: Standard' : `Canvas Rotated: ${nextRot}°`);
-            }}
-            className={`p-1.5 sm:p-2 rounded-lg transition-colors flex items-center gap-1 ${
-              canvasRotation !== 0
-                ? 'bg-indigo-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white'
-            }`}
-            title="Rotate Canvas (Landscape / Orientation - Shift+R)"
-          >
-            <RotateCw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
+            <button
+              onClick={() => {
+                setIsFullScreenCanvas(true);
+                showToast('Full-Screen Canvas Active');
+              }}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              title="Full-Screen Canvas Mode (Shift+F)"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
 
-          <button
-            onClick={() => setIsDiagnosticsOpen(!isDiagnosticsOpen)}
-            className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
-              isDiagnosticsOpen ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
-            }`}
-            title="Diagnostics"
-          >
-            <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
-        </div>
-      </header>
+            <button
+              onClick={() => setIsDiagnosticsOpen(!isDiagnosticsOpen)}
+              className={`p-2 rounded-xl transition-colors ${
+                isDiagnosticsOpen ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+              }`}
+              title="Diagnostics"
+            >
+              <Activity className="w-4 h-4" />
+            </button>
+          </div>
+        </header>
+      )}
 
       {/* Main Workspace Area */}
       <div className="relative flex-1 w-full bg-slate-950 flex items-center justify-center overflow-hidden">
+        {/* Floating Discreet Exit Fullscreen Button */}
+        {isFullScreenCanvas && (
+          <button
+            onClick={() => {
+              setIsFullScreenCanvas(false);
+              showToast('Exited Full-Screen Canvas Mode');
+            }}
+            className="fixed top-3 right-3 z-50 flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-900/60 hover:bg-slate-900 text-slate-300 hover:text-white border border-slate-700/60 shadow-2xl backdrop-blur-md opacity-40 hover:opacity-100 transition-all text-xs font-semibold group cursor-pointer"
+            title="Exit Full-Screen Canvas (Esc or Shift+F)"
+          >
+            <Minimize2 className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
+            <span className="hidden sm:inline font-medium">Exit Fullscreen</span>
+          </button>
+        )}
+
         {/* Desktop Docked Left Toolbar */}
-        <aside className="hidden md:flex absolute top-4 left-4 z-20 flex-col items-center gap-1.5 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md p-2 rounded-2xl shadow-2xl max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
-          {[
-            { id: 'pencil', label: 'Pencil (Fine Sketch - Key: P)', icon: Pencil },
-            { id: 'ink', label: 'Ink Pen (Clean Lines)', icon: PenTool },
-            { id: 'brush', label: 'Paint Brush (Painterly - Key: B)', icon: Paintbrush },
-            { id: 'marker', label: 'Highlighter / Marker (Key: M)', icon: Highlighter },
-            { id: 'spray', label: 'Airbrush / Spray (Key: S)', icon: Sparkles },
-            { id: 'chalk', label: 'Chalk / Charcoal', icon: Flame },
-            { id: 'calligraphy', label: 'Calligraphy Chisel', icon: Feather },
-            { id: 'soft', label: 'Soft Airbrush / Blur', icon: Circle },
-            { id: 'div-1', isDivider: true },
-            { id: 'eraser', label: 'Eraser (Key: E)', icon: Eraser },
-            { id: 'fill', label: 'Paint Bucket Fill (Key: F)', icon: PaintBucket },
-            { id: 'eyedropper', label: 'Color Eyedropper (Key: I)', icon: Pipette },
-            { id: 'div-2', isDivider: true },
-            { id: 'line', label: 'Line Tool (Key: L)', icon: Minus },
-            { id: 'rectangle', label: 'Rectangle (Key: R)', icon: Square },
-            { id: 'ellipse', label: 'Circle (Key: C)', icon: Circle },
-          ].map((item) => {
-            if ('isDivider' in item) {
-              return <div key={item.id} className="w-6 h-px bg-slate-800 my-0.5" />;
-            }
-            const Icon = item.icon;
-            const isActive = toolSettings.activeTool === item.id;
-            return (
+        {!isFullScreenCanvas && (
+          isLeftToolsMinimized ? (
+            <aside className="hidden md:flex absolute top-4 left-3 z-20 flex-col items-center gap-2 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md p-1.5 rounded-2xl shadow-2xl w-10">
               <button
-                key={item.id}
-                onClick={() => {
-                  setToolSettings({ ...toolSettings, activeTool: item.id as ToolType });
-                  showToast(`${item.label.split(' ')[0]} selected`);
-                }}
-                className={`p-2.5 rounded-xl transition-all relative group ${
-                  isActive
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                }`}
-                title={item.label}
+                onClick={() => setIsLeftToolsMinimized(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-all group"
+                title="Expand Tools Panel"
               >
-                <Icon className="w-5 h-5" />
-                <span className="absolute left-full ml-3 px-2 py-1 bg-slate-800 text-slate-100 text-[10px] font-medium rounded-md shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-30">
-                  {item.label}
-                </span>
+                <ChevronRight className="w-4 h-4 text-indigo-400 group-hover:translate-x-0.5 transition-transform" />
               </button>
-            );
-          })}
-        </aside>
+              
+              <div className="w-5 h-px bg-slate-800 my-0.5" />
+
+              {/* Active Tool Icon */}
+              {(() => {
+                const toolsMap: Record<string, React.FC<{ className?: string }>> = {
+                  pencil: Pencil,
+                  ink: PenTool,
+                  brush: Paintbrush,
+                  marker: Highlighter,
+                  spray: Sparkles,
+                  chalk: Flame,
+                  calligraphy: Feather,
+                  soft: Circle,
+                  eraser: Eraser,
+                  fill: PaintBucket,
+                  eyedropper: Pipette,
+                  line: Minus,
+                  rectangle: Square,
+                  ellipse: Circle,
+                };
+                const ActiveIcon = toolsMap[toolSettings.activeTool] || Pencil;
+                return (
+                  <div
+                    className="p-2 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
+                    title={`Active Tool: ${toolSettings.activeTool}`}
+                  >
+                    <ActiveIcon className="w-4 h-4" />
+                  </div>
+                );
+              })()}
+
+              {/* Vertical Quick Tools */}
+              <div className="flex flex-col items-center gap-1.5 pt-1">
+                {[
+                  { id: 'pencil', icon: Pencil, label: 'Pencil' },
+                  { id: 'brush', icon: Paintbrush, label: 'Brush' },
+                  { id: 'eraser', icon: Eraser, label: 'Eraser' },
+                  { id: 'fill', icon: PaintBucket, label: 'Fill Bucket' },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isActive = toolSettings.activeTool === item.id;
+                  if (isActive) return null;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setToolSettings({ ...toolSettings, activeTool: item.id as ToolType })}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                      title={item.label}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                    </button>
+                  );
+                })}
+              </div>
+            </aside>
+          ) : (
+            <aside className="hidden md:flex absolute top-4 left-4 z-20 flex-col items-center gap-1.5 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md p-2 rounded-2xl shadow-2xl max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
+              <div className="w-full flex items-center justify-between pb-1 border-b border-slate-800/80 mb-0.5 px-0.5">
+                <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">Tools</span>
+                <button
+                  onClick={() => setIsLeftToolsMinimized(true)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  title="Minimize Tools Panel"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              {[
+                { id: 'pencil', label: 'Pencil (Fine Sketch - Key: P)', icon: Pencil },
+                { id: 'ink', label: 'Ink Pen (Clean Lines)', icon: PenTool },
+                { id: 'brush', label: 'Paint Brush (Painterly - Key: B)', icon: Paintbrush },
+                { id: 'marker', label: 'Highlighter / Marker (Key: M)', icon: Highlighter },
+                { id: 'spray', label: 'Airbrush / Spray (Key: S)', icon: Sparkles },
+                { id: 'chalk', label: 'Chalk / Charcoal', icon: Flame },
+                { id: 'calligraphy', label: 'Calligraphy Chisel', icon: Feather },
+                { id: 'soft', label: 'Soft Airbrush / Blur', icon: Circle },
+                { id: 'div-1', isDivider: true },
+                { id: 'eraser', label: 'Eraser (Key: E)', icon: Eraser },
+                { id: 'fill', label: 'Paint Bucket Fill (Key: F)', icon: PaintBucket },
+                { id: 'eyedropper', label: 'Color Eyedropper (Key: I)', icon: Pipette },
+                { id: 'div-2', isDivider: true },
+                { id: 'line', label: 'Line Tool (Key: L)', icon: Minus },
+                { id: 'rectangle', label: 'Rectangle (Key: R)', icon: Square },
+                { id: 'ellipse', label: 'Circle (Key: C)', icon: Circle },
+              ].map((item) => {
+                if ('isDivider' in item) {
+                  return <div key={item.id} className="w-6 h-px bg-slate-800 my-0.5" />;
+                }
+                const Icon = item.icon;
+                const isActive = toolSettings.activeTool === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setToolSettings({ ...toolSettings, activeTool: item.id as ToolType });
+                      showToast(`${item.label.split(' ')[0]} selected`);
+                    }}
+                    className={`p-2.5 rounded-xl transition-all relative group ${
+                      isActive
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                    }`}
+                    title={item.label}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="absolute left-full ml-3 px-2 py-1 bg-slate-800 text-slate-100 text-[10px] font-medium rounded-md shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-30">
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </aside>
+          )
+        )}
 
         {/* Mobile Compact Tool Selector Pill */}
-        <div className="flex md:hidden absolute top-2 left-2 sm:top-3 sm:left-3 z-20 items-center gap-1.5 bg-slate-900/95 border border-slate-800 backdrop-blur-md p-1 pl-2 rounded-xl shadow-xl">
-          <button
-            onClick={() => setIsMobileToolsOpen(true)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 active:scale-95 transition-transform"
-          >
-            <span className="p-1 rounded-lg bg-indigo-600 text-white shadow">
+        {!isFullScreenCanvas && (
+          <div className="flex md:hidden absolute top-2 left-2 sm:top-3 sm:left-3 z-20 flex-col items-center gap-1.5 bg-slate-900/95 border border-slate-800 backdrop-blur-md p-1.5 rounded-2xl shadow-xl">
+            <button
+              onClick={() => setIsMobileToolsOpen(true)}
+              className="p-2 rounded-xl bg-indigo-600 text-white shadow active:scale-95 transition-transform"
+              title="Change Tool"
+            >
               {(() => {
                 const tools: Record<string, React.FC<{ className?: string }>> = {
                   pencil: Pencil,
@@ -1137,177 +1263,240 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
                   ellipse: Circle,
                 };
                 const ActiveIcon = tools[toolSettings.activeTool] || Pencil;
-                return <ActiveIcon className="w-3.5 h-3.5" />;
+                return <ActiveIcon className="w-4 h-4" />;
               })()}
-            </span>
-            <span className="capitalize font-medium text-slate-300 text-[11px] sm:text-xs">{toolSettings.activeTool}</span>
-            <Wrench className="w-3 h-3 text-indigo-400 ml-0.5" />
-          </button>
-        </div>
-
-        {/* Floating Contextual Tool Customizer (Color, Size, Opacity, Stabilizer) */}
-        <aside className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 z-20 flex items-center gap-2 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md px-2 py-1 md:px-3 md:py-2 rounded-2xl shadow-2xl text-xs">
-          {/* Color Palette Button */}
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setIsColorPickerOpen(true)}
-              className="flex items-center gap-1.5 p-1 pr-1.5 sm:p-1.5 sm:pr-2.5 rounded-xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700/80 transition-all active:scale-95 group"
-              title="Open Color Palette & Picker"
-            >
-              <div
-                className="w-4 h-4 sm:w-6 sm:h-6 rounded-lg border border-slate-600 shadow-inner flex items-center justify-center transition-transform group-hover:scale-105"
-                style={{ backgroundColor: toolSettings.color }}
-              />
-              <Palette className="w-3 h-3 sm:w-4 sm:h-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
-              <span className="hidden lg:inline text-[11px] font-mono text-slate-300 uppercase">{toolSettings.color}</span>
             </button>
-
-            {/* Quick Palette Swatches */}
-            <div className="hidden sm:flex items-center gap-1 bg-slate-950/50 p-1 rounded-xl border border-slate-800">
-              {['#000000', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#FFFFFF'].map((c) => (
-                <button
-                  key={c}
-                  onClick={() => handleColorChange(c)}
-                  className={`w-4 h-4 sm:w-5 sm:h-5 rounded-lg border transition-all ${
-                    toolSettings.color.toLowerCase() === c.toLowerCase()
-                      ? 'border-white scale-110 z-10 shadow'
-                      : 'border-slate-800 hover:border-slate-600 hover:scale-105'
-                  }`}
-                  style={{ backgroundColor: c }}
-                  title={c}
-                />
-              ))}
-            </div>
           </div>
+        )}
 
-          {toolSettings.activeTool !== 'eyedropper' && <div className="h-4 w-px bg-slate-800" />}
+        {/* Floating Contextual Tool Customizer (Color, Size 0-200, Opacity, Stabilizer) */}
+        {!isFullScreenCanvas && (
+          isBrushAdjustMinimized ? (
+            <button
+              onClick={() => setIsBrushAdjustMinimized(false)}
+              className="absolute top-3 right-3 z-20 p-2.5 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md rounded-2xl shadow-2xl text-indigo-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer active:scale-95 group"
+              title="Expand Brush Adjustment Controls"
+            >
+              <Sliders className="w-4 h-4 group-hover:scale-110 transition-transform" />
+            </button>
+          ) : (
+            <aside className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 z-20 flex items-center gap-2 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md px-2 py-1 md:px-3 md:py-2 rounded-2xl shadow-2xl text-xs">
+              {/* Color Palette Button */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setIsColorPickerOpen(true)}
+                  className="flex items-center gap-1.5 p-1 pr-1.5 sm:p-1.5 sm:pr-2.5 rounded-xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700/80 transition-all active:scale-95 group"
+                  title="Open Color Palette & Picker"
+                >
+                  <div
+                    className="w-4 h-4 sm:w-6 sm:h-6 rounded-lg border border-slate-600 shadow-inner flex items-center justify-center transition-transform group-hover:scale-105"
+                    style={{ backgroundColor: toolSettings.color }}
+                  />
+                  <Palette className="w-3 h-3 sm:w-4 sm:h-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+                  <span className="hidden lg:inline text-[11px] font-mono text-slate-300 uppercase">{toolSettings.color}</span>
+                </button>
 
-          {/* Size Slider (For Brush/Pencil/Eraser/Shapes) */}
-          {toolSettings.activeTool !== 'eyedropper' && toolSettings.activeTool !== 'fill' && (
-            <div className="flex items-center gap-1 sm:gap-2">
-              <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">Size</span>
-              <input
-                type="range"
-                min={1}
-                max={60}
-                value={toolSettings.size}
-                onChange={(e) => setToolSettings({ ...toolSettings, size: Number(e.target.value) })}
-                className="w-10 sm:w-20 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-              />
-              <span className="text-[10px] font-mono text-slate-300 w-3 sm:w-4 text-right">
-                {toolSettings.size}
-              </span>
-            </div>
-          )}
-
-          {/* Opacity Slider */}
-          {toolSettings.activeTool !== 'eyedropper' && (
-            <>
-              <div className="h-4 w-px bg-slate-800 hidden md:block" />
-              <div className="hidden md:flex items-center gap-2">
-                <span className="text-[10px] font-mono text-slate-400">Opacity</span>
-                <input
-                  type="range"
-                  min={0.1}
-                  max={1}
-                  step={0.05}
-                  value={toolSettings.opacity}
-                  onChange={(e) => setToolSettings({ ...toolSettings, opacity: Number(e.target.value) })}
-                  className="w-14 sm:w-16 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                />
-                <span className="text-[10px] font-mono text-slate-300 w-7 text-right">
-                  {Math.round(toolSettings.opacity * 100)}%
-                </span>
+                {/* Quick Palette Swatches */}
+                <div className="hidden sm:flex items-center gap-1 bg-slate-950/50 p-1 rounded-xl border border-slate-800">
+                  {['#000000', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#FFFFFF'].map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => handleColorChange(c)}
+                      className={`w-4 h-4 sm:w-5 sm:h-5 rounded-lg border transition-all ${
+                        toolSettings.color.toLowerCase() === c.toLowerCase()
+                          ? 'border-white scale-110 z-10 shadow'
+                          : 'border-slate-800 hover:border-slate-600 hover:scale-105'
+                      }`}
+                      style={{ backgroundColor: c }}
+                      title={c}
+                    />
+                  ))}
+                </div>
               </div>
-            </>
-          )}
 
-          {/* Stabilizer Level */}
-          {toolSettings.activeTool !== 'eyedropper' && toolSettings.activeTool !== 'fill' && (
-            <>
-              <div className="h-4 w-px bg-slate-800 hidden lg:block" />
-              <div className="hidden lg:flex items-center gap-2">
-                <span className="text-[10px] font-mono text-slate-400">Smooth</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={10}
-                  value={toolSettings.stabilizer}
-                  onChange={(e) => setToolSettings({ ...toolSettings, stabilizer: Number(e.target.value) })}
-                  className="w-14 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                />
-                <span className="text-[10px] font-mono text-slate-300 w-3 text-right">
-                  {toolSettings.stabilizer}
+              {toolSettings.activeTool !== 'eyedropper' && <div className="h-4 w-px bg-slate-800" />}
+
+              {/* Size Slider (0 to 200) */}
+              {toolSettings.activeTool !== 'eyedropper' && toolSettings.activeTool !== 'fill' && (
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">Size</span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={200}
+                    value={toolSettings.size}
+                    onChange={(e) => setToolSettings({ ...toolSettings, size: Number(e.target.value) })}
+                    className="w-12 sm:w-24 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  />
+                  <span className="text-[10px] font-mono text-slate-300 w-5 sm:w-7 text-right">
+                    {toolSettings.size}
+                  </span>
+                </div>
+              )}
+
+              {/* Opacity Slider */}
+              {toolSettings.activeTool !== 'eyedropper' && (
+                <>
+                  <div className="h-4 w-px bg-slate-800 hidden md:block" />
+                  <div className="hidden md:flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-slate-400">Opacity</span>
+                    <input
+                      type="range"
+                      min={0.1}
+                      max={1}
+                      step={0.05}
+                      value={toolSettings.opacity}
+                      onChange={(e) => setToolSettings({ ...toolSettings, opacity: Number(e.target.value) })}
+                      className="w-14 sm:w-16 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                    />
+                    <span className="text-[10px] font-mono text-slate-300 w-7 text-right">
+                      {Math.round(toolSettings.opacity * 100)}%
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {/* Stabilizer Level */}
+              {toolSettings.activeTool !== 'eyedropper' && toolSettings.activeTool !== 'fill' && (
+                <>
+                  <div className="h-4 w-px bg-slate-800 hidden lg:block" />
+                  <div className="hidden lg:flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-slate-400">Smooth</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={10}
+                      value={toolSettings.stabilizer}
+                      onChange={(e) => setToolSettings({ ...toolSettings, stabilizer: Number(e.target.value) })}
+                      className="w-14 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                    />
+                    <span className="text-[10px] font-mono text-slate-300 w-3 text-right">
+                      {toolSettings.stabilizer}
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {/* Eyedropper hint */}
+              {toolSettings.activeTool === 'eyedropper' && (
+                <span className="text-[11px] font-medium text-indigo-300 px-1">
+                  Tap canvas to sample color
                 </span>
-              </div>
-            </>
-          )}
+              )}
 
-          {/* Eyedropper hint */}
-          {toolSettings.activeTool === 'eyedropper' && (
-            <span className="text-[11px] font-medium text-indigo-300 px-1">
-              Tap canvas to sample color
-            </span>
-          )}
-        </aside>
+              <button
+                onClick={() => setIsBrushAdjustMinimized(true)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ml-1"
+                title="Minimize Brush Adjustments"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </aside>
+          )
+        )}
 
         {/* Zoom & Pan Overlay Controls */}
-        <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md px-2 py-1 rounded-xl shadow-xl text-xs">
-          <button
-            onClick={() => setZoom((prev) => Math.max(0.5, prev * 0.85))}
-            className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
-            title="Zoom Out"
-          >
-            <Minus className="w-3.5 h-3.5" />
-          </button>
-          <span className="font-mono text-[11px] text-slate-300 w-12 text-center font-semibold">
-            {Math.round(zoom * 100)}%
-          </span>
-          <button
-            onClick={() => setZoom((prev) => Math.min(5, prev * 1.15))}
-            className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
-            title="Zoom In"
-          >
-            <ChevronDown className="w-3.5 h-3.5 rotate-180" />
-          </button>
+        {!isFullScreenCanvas && (
+          isZoomPanelMinimized ? (
+            <aside className="absolute bottom-4 left-3 z-20 flex flex-col items-center gap-1.5 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md p-1.5 rounded-2xl shadow-2xl w-10">
+              <button
+                onClick={() => setIsZoomPanelMinimized(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                title="Expand View Adjustments"
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-indigo-400" />
+              </button>
+              <span className="font-mono text-[9px] font-bold text-slate-300">{Math.round(zoom * 100)}%</span>
+              <button
+                onClick={() => {
+                  const nextRot = (canvasRotation + 90) % 360;
+                  setCanvasRotation(nextRot);
+                  showToast(nextRot === 0 ? 'Canvas: Standard' : `Rotated: ${nextRot}°`);
+                }}
+                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Rotate Canvas"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+              </button>
+            </aside>
+          ) : (
+            <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md px-2 py-1 rounded-xl shadow-xl text-xs">
+              <button
+                onClick={() => setZoom((prev) => Math.max(0.5, prev * 0.85))}
+                className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                title="Zoom Out"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+              <span className="font-mono text-[11px] text-slate-300 w-12 text-center font-semibold">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                onClick={() => setZoom((prev) => Math.min(5, prev * 1.15))}
+                className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                title="Zoom In"
+              >
+                <ChevronDown className="w-3.5 h-3.5 rotate-180" />
+              </button>
 
-          <div className="h-3.5 w-px bg-slate-800 mx-0.5" />
+              <div className="h-3.5 w-px bg-slate-800 mx-0.5" />
 
-          {/* Rotate Canvas Button */}
-          <button
-            onClick={() => {
-              const nextRot = (canvasRotation + 90) % 360;
-              setCanvasRotation(nextRot);
-              showToast(nextRot === 0 ? 'Canvas Orientation: Standard' : `Canvas Rotated: ${nextRot}°`);
-            }}
-            className={`p-1 rounded transition-colors flex items-center gap-1 ${
-              canvasRotation !== 0
-                ? 'bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600 hover:text-white font-medium'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-            title="Rotate Canvas Orientation (Shift+R)"
-          >
-            <RotateCw className="w-3.5 h-3.5" />
-            {canvasRotation !== 0 && (
-              <span className="text-[10px] font-mono font-bold">{canvasRotation}°</span>
-            )}
-          </button>
+              {/* Rotate Canvas Button */}
+              <button
+                onClick={() => {
+                  const nextRot = (canvasRotation + 90) % 360;
+                  setCanvasRotation(nextRot);
+                  showToast(nextRot === 0 ? 'Canvas Orientation: Standard' : `Canvas Rotated: ${nextRot}°`);
+                }}
+                className={`p-1 rounded transition-colors flex items-center gap-1 ${
+                  canvasRotation !== 0
+                    ? 'bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600 hover:text-white font-medium'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+                title="Rotate Canvas Orientation (Shift+R)"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+                {canvasRotation !== 0 && (
+                  <span className="text-[10px] font-mono font-bold">{canvasRotation}°</span>
+                )}
+              </button>
 
-          {(zoom !== 1 || pan.x !== 0 || pan.y !== 0 || canvasRotation !== 0) && (
-            <button
-              onClick={() => {
-                setZoom(1);
-                setPan({ x: 0, y: 0 });
-                setCanvasRotation(0);
-                showToast('View Reset');
-              }}
-              className="ml-1 px-1.5 py-0.5 rounded bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600 hover:text-white text-[10px] font-semibold transition-colors"
-              title="Reset Zoom, Pan, and Canvas Rotation"
-            >
-              Reset
-            </button>
-          )}
-        </div>
+              <button
+                onClick={() => {
+                  setIsFullScreenCanvas(true);
+                  showToast('Full-Screen Canvas Active');
+                }}
+                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Full-Screen Canvas Mode (Shift+F)"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+
+              {(zoom !== 1 || pan.x !== 0 || pan.y !== 0 || canvasRotation !== 0) && (
+                <button
+                  onClick={() => {
+                    setZoom(1);
+                    setPan({ x: 0, y: 0 });
+                    setCanvasRotation(0);
+                    showToast('View Reset');
+                  }}
+                  className="ml-1 px-1.5 py-0.5 rounded bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600 hover:text-white text-[10px] font-semibold transition-colors"
+                  title="Reset Zoom, Pan, and Canvas Rotation"
+                >
+                  Reset
+                </button>
+              )}
+
+              <button
+                onClick={() => setIsZoomPanelMinimized(true)}
+                className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors ml-0.5"
+                title="Minimize View Adjustments"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )
+        )}
 
         {/* Dedicated Interactive Animation Canvas */}
         <div ref={containerRef} className="w-full h-full flex items-center justify-center p-1 sm:p-2.5 landscape:p-0.5 overflow-hidden">
@@ -1327,41 +1516,60 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
 
 
       {/* Bottom Timeline */}
-      <Timeline
-        project={project}
-        activeFrameIndex={activeFrameIndex}
-        isPlaying={isPlaying}
-        onSelectFrame={handleSelectFrame}
-        onAddFrame={handleAddFrame}
-        onDuplicateFrame={handleDuplicateFrame}
-        onDeleteFrame={handleDeleteFrame}
-        onTogglePlay={() => setIsPlaying(!isPlaying)}
-        onChangeFps={(newFps) => {
-          const updated = {
-            ...project,
-            settings: { ...project.settings, fps: newFps },
-          };
-          setProject(updated);
-          syncService.sendPlaybackOp({ action: 'setFps', fps: newFps });
-          triggerAutosave(updated);
-        }}
-        onToggleOnionSkin={() => {
-          const updated = {
-            ...project,
-            settings: {
-              ...project.settings,
-              onionSkin: {
-                ...project.settings.onionSkin,
-                enabled: !project.settings.onionSkin.enabled,
+      {!isFullScreenCanvas && (
+        <Timeline
+          project={project}
+          activeFrameIndex={activeFrameIndex}
+          isPlaying={isPlaying}
+          onSelectFrame={handleSelectFrame}
+          onAddFrame={handleAddFrame}
+          onDuplicateFrame={handleDuplicateFrame}
+          onDeleteFrame={handleDeleteFrame}
+          onTogglePlay={() => setIsPlaying(!isPlaying)}
+          onChangeFps={(newFps) => {
+            const updated = {
+              ...project,
+              settings: { ...project.settings, fps: newFps },
+            };
+            setProject(updated);
+            syncService.sendPlaybackOp({ action: 'setFps', fps: newFps });
+            triggerAutosave(updated);
+          }}
+          onToggleOnionSkin={() => {
+            const updated = {
+              ...project,
+              settings: {
+                ...project.settings,
+                onionSkin: {
+                  ...project.settings.onionSkin,
+                  enabled: !project.settings.onionSkin.enabled,
+                },
               },
-            },
-          };
-          setProject(updated);
-          triggerAutosave(updated);
-        }}
-        onOpenOnionSettings={() => setIsOnionSettingsOpen(true)}
-        onOpenLayers={() => setIsLayerPanelOpen(true)}
-      />
+            };
+            setProject(updated);
+            triggerAutosave(updated);
+          }}
+          onChangeOnionSkinSettings={(partialSettings) => {
+            const updated = {
+              ...project,
+              settings: {
+                ...project.settings,
+                onionSkin: {
+                  ...project.settings.onionSkin,
+                  ...partialSettings,
+                  enabled: true, // Auto-enable when adjusting frame count
+                },
+              },
+            };
+            setProject(updated);
+            triggerAutosave(updated);
+          }}
+          onOpenOnionSettings={() => setIsOnionSettingsOpen(true)}
+          onOpenLayers={() => setIsLayerPanelOpen(true)}
+          isMinimized={isTimelineMinimized}
+          onToggleMinimize={() => setIsTimelineMinimized(!isTimelineMinimized)}
+        />
+      )}
 
       {/* Layer Management Drawer */}
       <LayerPanel
@@ -1509,6 +1717,24 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
                 );
               })}
             </div>
+
+            {/* Mobile Tool Size Adjustment (1 to 200) */}
+            {toolSettings.activeTool !== 'eyedropper' && toolSettings.activeTool !== 'fill' && (
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-300">Stroke Size</span>
+                  <span className="font-mono text-indigo-400 font-bold">{toolSettings.size}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={200}
+                  value={toolSettings.size}
+                  onChange={(e) => setToolSettings({ ...toolSettings, size: Number(e.target.value) })}
+                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1542,6 +1768,24 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
         strokeCount={
           (project.layerFrames[`${activeLayerId}:${project.frames[activeFrameIndex]?.id}`] || []).length
         }
+      />
+
+      {/* Onion Skin Settings Modal */}
+      <OnionSkinModal
+        isOpen={isOnionSettingsOpen}
+        onClose={() => setIsOnionSettingsOpen(false)}
+        settings={project.settings.onionSkin}
+        onChangeSettings={(newSettings) => {
+          const updated = {
+            ...project,
+            settings: {
+              ...project.settings,
+              onionSkin: newSettings,
+            },
+          };
+          setProject(updated);
+          triggerAutosave(updated);
+        }}
       />
     </div>
   );

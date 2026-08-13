@@ -59,22 +59,18 @@ export const Home: React.FC<HomeProps> = ({
     id: string
   ) => {
     e.stopPropagation();
-
-    if (confirm('Delete this animation project?')) {
-      await deleteProject(id);
-      await reloadProjects();
-    }
+    // Optimistically update UI immediately for instant single-click deletion
+    setRecentProjects((prev) => prev.filter((p) => p.id !== id));
+    await deleteProject(id);
+    await reloadProjects();
   };
 
-  const handleClearAll = async () => {
-    if (
-      confirm(
-        `Are you sure you want to delete ALL ${recentProjects.length} animation project(s)? This action cannot be undone.`
-      )
-    ) {
-      await deleteAllProjects();
-      await reloadProjects();
-    }
+  const handleClearAll = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    // Optimistically update UI immediately for instant single-click deletion
+    setRecentProjects([]);
+    await deleteAllProjects();
+    await reloadProjects();
   };
 
   const handleFileUpload = (

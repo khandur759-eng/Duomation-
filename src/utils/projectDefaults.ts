@@ -1,6 +1,6 @@
 import { Project, Layer, Frame, CanvasSettings } from '../types/animation';
 
-export function createNewProject(name = 'Untitled Animation'): Project {
+export function createNewProject(name = 'Duomation'): Project {
   const defaultLayer: Layer = {
     id: 'layer_1',
     name: 'Layer 1',

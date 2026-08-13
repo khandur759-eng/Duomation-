@@ -473,19 +473,26 @@ const getNormalizedPoint = useCallback(
     const rect = container.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
 
-    const targetAspect = (project.settings?.width || 1920) / (project.settings?.height || 1080);
-    const containerAspect = rect.width / rect.height;
+    const baseAspect =
+  (project.settings?.width || 1920) /
+  (project.settings?.height || 1080);
 
-    let displayWidth = rect.width;
-    let displayHeight = rect.height;
+const targetAspect = canvasRotation === 90
+  ? 1 / baseAspect
+  : baseAspect;
 
-    if (containerAspect > targetAspect) {
-      displayHeight = rect.height;
-      displayWidth = rect.height * targetAspect;
-    } else {
-      displayWidth = rect.width;
-      displayHeight = rect.width / targetAspect;
-    }
+const containerAspect = rect.width / rect.height;
+
+let displayWidth = rect.width;
+let displayHeight = rect.height;
+
+if (containerAspect > targetAspect) {
+  displayHeight = rect.height;
+  displayWidth = rect.height * targetAspect;
+} else {
+  displayWidth = rect.width;
+  displayHeight = rect.width / targetAspect;
+}
 
     canvas.style.width = `${displayWidth}px`;
     canvas.style.height = `${displayHeight}px`;
@@ -493,7 +500,12 @@ const getNormalizedPoint = useCallback(
     canvas.width = Math.round(displayWidth * dpr);
     canvas.height = Math.round(displayHeight * dpr);
     renderPass();
-  }, [project.settings?.width, project.settings?.height, renderPass]);
+  }, [
+  project.settings?.width,
+  project.settings?.height,
+  canvasRotation,
+  renderPass,
+]);
 
   useEffect(() => {
     updateCanvasBounds();

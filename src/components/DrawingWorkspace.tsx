@@ -1305,22 +1305,25 @@ if (containerAspect > targetAspect) {
   ref={containerRef}
   className="relative w-full h-full min-h-0 flex items-center justify-center overflow-hidden p-0"
 >
-          <canvas
-            ref={canvasRef}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            onPointerEnter={handlePointerEnter}
-            onPointerLeave={handlePointerLeave}
-            className="w-full h-full object-contain touch-none cursor-crosshair shadow-2xl rounded-lg"
-style={{
-  transform: `rotate(${canvasRotation}deg)`,
-  transition: 'transform 500ms ease',
-}}
-          />
-        </div>
-      </div>
+         <canvas
+  ref={canvasRef}
+  onPointerDown={handlePointerDown}
+  onPointerMove={handlePointerMove}
+  onPointerUp={handlePointerUp}
+  onPointerCancel={handlePointerUp}
+  onPointerEnter={handlePointerEnter}
+  onPointerLeave={handlePointerLeave}
+  className="touch-none cursor-crosshair shadow-2xl rounded-lg"
+  style={{
+    width: canvasRotation === 90 ? 'auto' : '100%',
+    height: canvasRotation === 90 ? 'auto' : '100%',
+    maxWidth: '100%',
+    maxHeight: '100%',
+    objectFit: 'contain',
+    transform: `rotate(${canvasRotation}deg)`,
+    transition: 'transform 500ms ease',
+  }}
+/>
 
 
       {/* Bottom Timeline */}

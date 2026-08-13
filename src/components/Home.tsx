@@ -106,90 +106,65 @@ export const Home: React.FC<HomeProps> = ({
   };
 
   return (
-    <div className="h-screen w-full overflow-y-auto overflow-x-hidden bg-[#f7f7fb] text-slate-950 flex flex-col p-5 sm:p-7 md:p-10 lg:p-14 selection:bg-indigo-200 selection:text-indigo-950">
-
-      {/* Floating animation styles — visual only */}
-      <style>{`
-        @keyframes duomation-float {
-          0%, 100% {
-            transform: translateY(0);
-          }
-
-          50% {
-            transform: translateY(-6px);
-          }
-        }
-
-        .duomation-float {
-          animation: duomation-float 5s ease-in-out infinite;
-          will-change: transform;
-        }
-
-        .duomation-float-delay {
-          animation: duomation-float 5.8s ease-in-out infinite;
-          animation-delay: -1.5s;
-          will-change: transform;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .duomation-float,
-          .duomation-float-delay {
-            animation: none;
-          }
-        }
-      `}</style>
+    <div className="h-full w-full overflow-y-auto overflow-x-hidden bg-[#f6f7fb] text-slate-950 selection:bg-indigo-200 selection:text-indigo-950">
 
       {/* Premium background atmosphere */}
       <div
         className="pointer-events-none fixed inset-0 overflow-hidden"
         aria-hidden="true"
       >
-        <div className="absolute -top-48 -left-32 h-[28rem] w-[28rem] rounded-full bg-indigo-300/25 blur-3xl" />
-        <div className="absolute top-20 right-[-10rem] h-[32rem] w-[32rem] rounded-full bg-fuchsia-200/30 blur-3xl" />
-        <div className="absolute bottom-[-12rem] left-1/3 h-[28rem] w-[28rem] rounded-full bg-violet-200/25 blur-3xl" />
+        <div className="absolute -top-52 -left-40 h-[32rem] w-[32rem] rounded-full bg-indigo-300/25 blur-3xl" />
+
+        <div className="absolute top-20 right-[-12rem] h-[34rem] w-[34rem] rounded-full bg-violet-300/20 blur-3xl" />
+
+        <div className="absolute bottom-[-14rem] left-1/3 h-[30rem] w-[30rem] rounded-full bg-fuchsia-200/20 blur-3xl" />
       </div>
 
-      <div className="relative max-w-6xl mx-auto w-full space-y-16 sm:space-y-20">
+      <div className="relative mx-auto w-full max-w-6xl px-5 py-7 sm:px-8 md:px-12 lg:px-16">
 
-        {/* Header */}
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* ================= HEADER ================= */}
+
+        <header className="flex items-center justify-between gap-4 mb-16 sm:mb-20">
 
           <div className="flex items-center gap-3 sm:gap-4">
 
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-500 flex items-center justify-center font-black text-white text-xl sm:text-2xl shadow-xl shadow-indigo-500/25">
+            <div className="relative flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-500 text-xl sm:text-2xl font-black text-white shadow-xl shadow-indigo-500/25">
               D
             </div>
 
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-950 tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-[-0.035em] text-slate-950">
                 Duomation
               </h1>
 
-              <p className="text-xs sm:text-sm text-slate-500 font-mono">
+              <p className="font-mono text-xs sm:text-sm tracking-tight text-slate-500">
                 2D Animation Workstation
               </p>
             </div>
 
           </div>
 
+          {/* Existing controls intentionally remain hidden,
+              exactly as in the original implementation. */}
+
           <div className="hidden items-center gap-2">
 
             <div
-              className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-xs font-mono"
+              className="flex items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-mono text-emerald-600"
               title={`Supabase Project ID: ${SUPABASE_PROJECT_ID}`}
             >
-              <Database className="w-3.5 h-3.5" />
+              <Database className="h-3.5 w-3.5" />
 
               <span>
                 Supabase Cloud Sync
               </span>
 
-              <CheckCircle2 className="w-3.5 h-3.5" />
+              <CheckCircle2 className="h-3.5 w-3.5" />
             </div>
 
-            <label className="cursor-pointer flex items-center gap-2 py-2 px-3.5 rounded-xl bg-white/80 border border-slate-200 hover:border-slate-300 text-slate-600 text-xs font-medium transition-colors">
+            <label className="cursor-pointer flex items-center gap-2 rounded-xl border border-slate-200 bg-white/80 px-3.5 py-2 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:border-slate-300">
 
-              <Upload className="w-4 h-4 text-slate-500" />
+              <Upload className="h-4 w-4 text-slate-500" />
 
               <span>
                 Import JSON
@@ -209,20 +184,22 @@ export const Home: React.FC<HomeProps> = ({
         </header>
 
 
-        {/* Hero & Dual Primary Actions */}
+        {/* ================= HERO ================= */}
+
         <section className="space-y-9">
 
           <div className="max-w-4xl space-y-5">
 
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/75 backdrop-blur-xl border border-indigo-100 text-indigo-600 text-xs sm:text-sm font-semibold shadow-sm">
+            <span className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white/75 px-4 py-2 text-xs sm:text-sm font-semibold text-indigo-600 shadow-sm backdrop-blur-xl">
 
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="h-4 w-4" />
 
               Two-Device Synchronized Workstation
 
             </span>
 
-            <h2 className="text-5xl sm:text-6xl lg:text-7xl font-black leading-[0.98] tracking-[-0.055em] text-slate-950">
+
+            <h2 className="text-5xl sm:text-6xl lg:text-7xl font-black leading-[0.97] tracking-[-0.06em] text-slate-950">
 
               Animate effortlessly across{' '}
 
@@ -234,7 +211,8 @@ export const Home: React.FC<HomeProps> = ({
 
             </h2>
 
-            <p className="text-base sm:text-lg lg:text-xl leading-8 text-slate-500 max-w-2xl">
+
+            <p className="max-w-2xl text-base sm:text-lg lg:text-xl leading-8 text-slate-500">
 
               Turn device A into a precision tablet drawing controller and device B into a full-screen dedicated animation display monitor.
 
@@ -243,26 +221,29 @@ export const Home: React.FC<HomeProps> = ({
           </div>
 
 
-          {/* Primary Action Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {/* ================= PRIMARY ACTIONS ================= */}
 
-            {/* Create Animation */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+
+            {/* CREATE ANIMATION */}
+
             <button
               onClick={onCreateProject}
-              className="duomation-float group relative p-6 sm:p-7 rounded-[2rem] bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-500 hover:from-indigo-500 hover:via-violet-500 hover:to-fuchsia-400 text-white shadow-2xl shadow-indigo-500/25 text-left transition-all active:scale-[0.99] flex flex-col justify-between min-h-48 sm:min-h-52 border border-white/30 overflow-hidden"
+              className="group relative flex min-h-48 sm:min-h-52 flex-col justify-between overflow-hidden rounded-[2rem] border border-white/30 bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-500 p-6 sm:p-7 text-left text-white shadow-2xl shadow-indigo-500/25 transition-all hover:from-indigo-500 hover:via-violet-500 hover:to-fuchsia-400 active:scale-[0.99]"
             >
 
-              <div className="absolute -right-12 -top-16 h-40 w-40 rounded-full bg-white/20 blur-2xl group-hover:scale-125 transition-transform" />
+              <div className="absolute -right-12 -top-16 h-40 w-40 rounded-full bg-white/20 blur-2xl transition-transform group-hover:scale-125" />
 
-              <div className="relative flex justify-between items-start">
+              <div className="relative flex items-start justify-between">
 
-                <div className="p-3 rounded-2xl bg-white/15 backdrop-blur-md ring-1 ring-white/20">
+                <div className="rounded-2xl bg-white/15 p-3 backdrop-blur-md ring-1 ring-white/20">
 
-                  <Smartphone className="w-6 h-6 text-white" />
+                  <Smartphone className="h-6 w-6 text-white" />
 
                 </div>
 
-                <span className="text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider bg-white/15 backdrop-blur-md px-3 py-1.5 rounded-full ring-1 ring-white/20">
+
+                <span className="rounded-full bg-white/15 px-3 py-1.5 text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider backdrop-blur-md ring-1 ring-white/20">
 
                   Device A (Draw)
 
@@ -270,17 +251,18 @@ export const Home: React.FC<HomeProps> = ({
 
               </div>
 
+
               <div className="relative">
 
-                <h3 className="text-2xl sm:text-3xl font-bold text-white group-hover:translate-x-1 transition-transform flex items-center gap-2 tracking-tight">
+                <h3 className="flex items-center gap-2 text-2xl sm:text-3xl font-bold tracking-tight text-white transition-transform group-hover:translate-x-1">
 
                   Create Animation
 
-                  <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
 
                 </h3>
 
-                <p className="text-sm text-indigo-50/90 mt-2">
+                <p className="mt-2 text-sm text-indigo-50/90">
 
                   Start drawing & edit frame timeline on this device.
 
@@ -291,23 +273,26 @@ export const Home: React.FC<HomeProps> = ({
             </button>
 
 
-            {/* Join Session / Display Monitor */}
+            {/* DISPLAY MONITOR */}
+
             <button
               onClick={() => onJoinSession('display')}
-              className="duomation-float-delay group relative p-6 sm:p-7 rounded-[2rem] bg-white/75 backdrop-blur-xl border border-slate-200 hover:border-indigo-200 hover:bg-white text-slate-950 text-left transition-all active:scale-[0.99] flex flex-col justify-between min-h-48 sm:min-h-52 shadow-xl shadow-slate-200/40 overflow-hidden"
+              className="group relative flex min-h-48 sm:min-h-52 flex-col justify-between overflow-hidden rounded-[2rem] border border-slate-200 bg-white/75 p-6 sm:p-7 text-left text-slate-950 shadow-xl shadow-slate-200/40 backdrop-blur-xl transition-all hover:border-indigo-200 hover:bg-white active:scale-[0.99]"
             >
 
-              <div className="absolute -right-16 -bottom-20 h-44 w-44 rounded-full bg-indigo-100/60 blur-3xl group-hover:bg-violet-100/70 transition-colors" />
+              <div className="absolute -bottom-20 -right-16 h-44 w-44 rounded-full bg-indigo-100/60 blur-3xl transition-colors group-hover:bg-violet-100/70" />
 
-              <div className="relative flex justify-between items-start">
 
-                <div className="p-3 rounded-2xl bg-slate-100 text-indigo-600 ring-1 ring-slate-200">
+              <div className="relative flex items-start justify-between">
 
-                  <Monitor className="w-6 h-6" />
+                <div className="rounded-2xl bg-slate-100 p-3 text-indigo-600 ring-1 ring-slate-200">
+
+                  <Monitor className="h-6 w-6" />
 
                 </div>
 
-                <span className="text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full">
+
+                <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider text-slate-500">
 
                   Device B (Display)
 
@@ -315,15 +300,16 @@ export const Home: React.FC<HomeProps> = ({
 
               </div>
 
+
               <div className="relative">
 
-                <h3 className="text-2xl sm:text-3xl font-bold text-slate-950 group-hover:translate-x-1 transition-transform flex items-center gap-2 tracking-tight">
+                <h3 className="flex items-center gap-2 text-2xl sm:text-3xl font-bold tracking-tight text-slate-950 transition-transform group-hover:translate-x-1">
 
                   Connect Display Monitor
 
                 </h3>
 
-                <p className="text-sm text-slate-500 mt-2">
+                <p className="mt-2 text-sm text-slate-500">
 
                   Scan QR code or enter code to use this screen as a live monitor.
 
@@ -338,28 +324,30 @@ export const Home: React.FC<HomeProps> = ({
         </section>
 
 
-        {/* Recent Projects Gallery */}
-        <section className="space-y-5 pt-8 border-t border-slate-200/80">
+        {/* ================= RECENT PROJECTS ================= */}
 
-          <div className="flex items-center justify-between">
+        <section className="mt-20 space-y-5 border-t border-slate-200/80 pt-8">
 
-            <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-2">
+          <div className="flex items-center justify-between gap-3">
 
-              <FolderOpen className="w-4 h-4 text-indigo-500" />
+            <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-600">
+
+              <FolderOpen className="h-4 w-4 text-indigo-500" />
 
               Recent Projects ({recentProjects.length})
 
             </h3>
 
+
             {recentProjects.length > 0 && (
 
               <button
                 onClick={handleClearAll}
-                className="flex items-center gap-1.5 py-2 px-3 rounded-lg bg-rose-50 border border-rose-100 text-rose-500 hover:bg-rose-100 hover:text-rose-600 text-xs font-medium transition-colors"
+                className="flex items-center gap-1.5 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-500 transition-colors hover:bg-rose-100 hover:text-rose-600"
                 title="Delete all recent projects"
               >
 
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="h-3.5 w-3.5" />
 
                 <span>
                   Clear All Projects
@@ -374,7 +362,7 @@ export const Home: React.FC<HomeProps> = ({
 
           {recentProjects.length === 0 ? (
 
-            <div className="p-10 rounded-3xl border border-dashed border-slate-300 bg-white/45 text-center text-slate-400 text-xs shadow-sm">
+            <div className="rounded-3xl border border-dashed border-slate-300 bg-white/45 p-10 text-center text-xs text-slate-400 shadow-sm">
 
               No recent animation projects stored on this device.
 
@@ -382,29 +370,29 @@ export const Home: React.FC<HomeProps> = ({
 
           ) : (
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
 
               {recentProjects.map((proj) => (
 
                 <div
                   key={proj.id}
-                  className="group relative p-4 rounded-2xl bg-white/70 backdrop-blur-xl border border-slate-200 hover:border-indigo-200 hover:bg-white cursor-pointer transition-all flex items-center justify-between shadow-sm hover:shadow-lg hover:shadow-indigo-100/40"
+                  className="group relative flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition-all hover:border-indigo-200 hover:bg-white hover:shadow-lg hover:shadow-indigo-100/40"
                 >
 
                   <div
-                    className="flex-1 min-w-0 cursor-pointer"
+                    className="min-w-0 flex-1 cursor-pointer"
                     onClick={() => onOpenProject(proj.id)}
                   >
 
                     <div className="space-y-1 truncate pr-2">
 
-                      <h4 className="text-sm font-semibold text-slate-800 group-hover:text-slate-950 truncate">
+                      <h4 className="truncate text-sm font-semibold text-slate-800 group-hover:text-slate-950">
 
                         {proj.name}
 
                       </h4>
 
-                      <p className="text-[11px] text-slate-400 font-mono">
+                      <p className="font-mono text-[11px] text-slate-400">
 
                         {proj.frameCount} frame(s) • {new Date(proj.updatedAt).toLocaleDateString()}
 
@@ -417,11 +405,11 @@ export const Home: React.FC<HomeProps> = ({
 
                   <button
                     onClick={(e) => handleDelete(e, proj.id)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+                    className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-500"
                     title="Delete Project"
                   >
 
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="h-4 w-4" />
 
                   </button>
 
@@ -436,25 +424,30 @@ export const Home: React.FC<HomeProps> = ({
         </section>
 
 
-        {/* SEO & Product Information */}
-        <section className="space-y-10 pt-8 border-t border-slate-200/80">
+        {/* ================= SEO / PRODUCT INFORMATION ================= */}
 
-          {/* Main Description */}
-          <div className="space-y-4">
+        <section className="mt-20 space-y-12 border-t border-slate-200/80 pt-10">
 
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 text-xs font-semibold">
+
+          {/* MAIN DESCRIPTION */}
+
+          <div className="max-w-3xl space-y-4">
+
+            <span className="inline-flex rounded-full border border-indigo-100 bg-white/75 px-4 py-2 text-xs font-semibold text-indigo-600 shadow-sm backdrop-blur-xl">
 
               Dual-Device Creative Workspace
 
             </span>
 
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-950 tracking-tight">
+
+            <h2 className="text-3xl sm:text-4xl font-black tracking-[-0.04em] text-slate-950">
 
               Connect Two Devices. Create as One.
 
             </h2>
 
-            <p className="text-sm sm:text-base leading-7 text-slate-500 max-w-3xl">
+
+            <p className="text-sm sm:text-base leading-7 text-slate-500">
 
               Duomation is a dual-device creative workspace designed to connect two devices into one synchronized animation workflow. Use one device as your drawing and animation controller while another device becomes a dedicated display screen. Duomation brings both screens together so you can create, preview, and work with animations across devices directly in your browser.
 
@@ -463,16 +456,17 @@ export const Home: React.FC<HomeProps> = ({
           </div>
 
 
-          {/* Dual Device Workflow */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* DEVICE WORKFLOW */}
 
-            <div className="p-6 rounded-3xl bg-white/65 border border-slate-200 shadow-lg shadow-slate-200/30 backdrop-blur-xl">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
 
-              <div className="flex items-center gap-3 mb-4">
+            <div className="rounded-3xl border border-slate-200 bg-white/65 p-6 sm:p-7 shadow-lg shadow-slate-200/30 backdrop-blur-xl">
 
-                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+              <div className="mb-4 flex items-center gap-3">
 
-                  <Smartphone className="w-5 h-5" />
+                <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600">
+
+                  <Smartphone className="h-5 w-5" />
 
                 </div>
 
@@ -484,6 +478,7 @@ export const Home: React.FC<HomeProps> = ({
 
               </div>
 
+
               <p className="text-sm leading-6 text-slate-500">
 
                 Use your primary device as a drawing and animation workspace. Create frames, draw your artwork, edit your animation timeline, manage layers, and control your animation from one screen.
@@ -493,13 +488,13 @@ export const Home: React.FC<HomeProps> = ({
             </div>
 
 
-            <div className="p-6 rounded-3xl bg-white/65 border border-slate-200 shadow-lg shadow-slate-200/30 backdrop-blur-xl">
+            <div className="rounded-3xl border border-slate-200 bg-white/65 p-6 sm:p-7 shadow-lg shadow-slate-200/30 backdrop-blur-xl">
 
-              <div className="flex items-center gap-3 mb-4">
+              <div className="mb-4 flex items-center gap-3">
 
-                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+                <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600">
 
-                  <Monitor className="w-5 h-5" />
+                  <Monitor className="h-5 w-5" />
 
                 </div>
 
@@ -510,6 +505,7 @@ export const Home: React.FC<HomeProps> = ({
                 </h3>
 
               </div>
+
 
               <p className="text-sm leading-6 text-slate-500">
 
@@ -522,106 +518,88 @@ export const Home: React.FC<HomeProps> = ({
           </div>
 
 
-          {/* How It Works */}
+          {/* HOW IT WORKS */}
+
           <div className="space-y-5">
 
-            <h2 className="text-2xl font-bold text-slate-950">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">
 
               How Duomation Works
 
             </h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
-              <div className="p-5 rounded-2xl bg-white/55 border border-slate-200 backdrop-blur-xl">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 
-                <div className="text-indigo-600 font-bold text-sm mb-2">
+              {[
+                {
+                  number: '01 — Connect',
+                  title: 'Connect Two Devices',
+                  text: 'Pair your devices using the Duomation connection system and establish a synchronized workspace.'
+                },
+                {
+                  number: '02 — Create',
+                  title: 'Draw and Animate',
+                  text: 'Create frame-by-frame animations using the drawing workspace, timeline, layers, and animation tools.'
+                },
+                {
+                  number: '03 — Experience',
+                  title: 'Use Both Screens',
+                  text: 'Keep your creative controls on one device while using another screen as your dedicated animation display.'
+                }
+              ].map((item) => (
 
-                  01 — Connect
+                <div
+                  key={item.number}
+                  className="rounded-2xl border border-slate-200 bg-white/55 p-5 backdrop-blur-xl"
+                >
 
-                </div>
+                  <div className="mb-2 text-sm font-bold text-indigo-600">
 
-                <h3 className="text-base font-semibold text-slate-950 mb-2">
+                    {item.number}
 
-                  Connect Two Devices
+                  </div>
 
-                </h3>
+                  <h3 className="mb-2 text-base font-semibold text-slate-950">
 
-                <p className="text-sm leading-6 text-slate-500">
+                    {item.title}
 
-                  Pair your devices using the Duomation connection system and establish a synchronized workspace.
+                  </h3>
 
-                </p>
+                  <p className="text-sm leading-6 text-slate-500">
 
-              </div>
+                    {item.text}
 
-
-              <div className="p-5 rounded-2xl bg-white/55 border border-slate-200 backdrop-blur-xl">
-
-                <div className="text-indigo-600 font-bold text-sm mb-2">
-
-                  02 — Create
-
-                </div>
-
-                <h3 className="text-base font-semibold text-slate-950 mb-2">
-
-                  Draw and Animate
-
-                </h3>
-
-                <p className="text-sm leading-6 text-slate-500">
-
-                  Create frame-by-frame animations using the drawing workspace, timeline, layers, and animation tools.
-
-                </p>
-
-              </div>
-
-
-              <div className="p-5 rounded-2xl bg-white/55 border border-slate-200 backdrop-blur-xl">
-
-                <div className="text-indigo-600 font-bold text-sm mb-2">
-
-                  03 — Experience
+                  </p>
 
                 </div>
 
-                <h3 className="text-base font-semibold text-slate-950 mb-2">
-
-                  Use Both Screens
-
-                </h3>
-
-                <p className="text-sm leading-6 text-slate-500">
-
-                  Keep your creative controls on one device while using another screen as your dedicated animation display.
-
-                </p>
-
-              </div>
+              ))}
 
             </div>
 
           </div>
 
 
-          {/* What Duomation Is */}
-          <div className="space-y-4">
+          {/* WHAT IS DUOMATION */}
 
-            <h2 className="text-2xl font-bold text-slate-950">
+          <div className="max-w-3xl space-y-4">
+
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-950">
 
               What Is Duomation?
 
             </h2>
 
-            <p className="text-sm sm:text-base leading-7 text-slate-500 max-w-3xl">
+
+            <p className="text-sm sm:text-base leading-7 text-slate-500">
 
               Duomation is a browser-based dual-device animation platform that connects multiple screens into a synchronized creative workflow. Its main purpose is to make two-device animation more practical by separating creation and display across connected devices.
 
             </p>
 
-            <p className="text-sm sm:text-base leading-7 text-slate-500 max-w-3xl">
+
+            <p className="text-sm sm:text-base leading-7 text-slate-500">
 
               It combines cross-device connectivity with digital drawing and frame-by-frame animation, giving creators a flexible workspace without requiring traditional desktop animation software.
 
@@ -630,34 +608,36 @@ export const Home: React.FC<HomeProps> = ({
           </div>
 
 
-          {/* Use Cases */}
+          {/* USE CASES */}
+
           <div className="space-y-5">
 
-            <h2 className="text-2xl font-bold text-slate-950">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-950">
 
               What Can You Use Duomation For?
 
             </h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 
               {[
-                "Dual-device animation workflows",
-                "Frame-by-frame 2D animation",
-                "Drawing animations in a browser",
-                "Using a second device as an animation display",
-                "Creating animations across connected screens",
-                "Digital drawing and animation projects",
-                "Previewing animation on a separate screen",
-                "Portable animation workflows",
+                'Dual-device animation workflows',
+                'Frame-by-frame 2D animation',
+                'Drawing animations in a browser',
+                'Using a second device as an animation display',
+                'Creating animations across connected screens',
+                'Digital drawing and animation projects',
+                'Previewing animation on a separate screen',
+                'Portable animation workflows',
               ].map((item) => (
 
                 <div
                   key={item}
-                  className="flex items-center gap-3 p-4 rounded-2xl bg-white/60 border border-slate-200 backdrop-blur-xl"
+                  className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/60 p-4 backdrop-blur-xl"
                 >
 
-                  <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />
 
                   <span className="text-sm text-slate-600">
 
@@ -675,17 +655,20 @@ export const Home: React.FC<HomeProps> = ({
 
 
           {/* FAQ */}
+
           <div className="space-y-5">
 
-            <h2 className="text-2xl font-bold text-slate-950">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-950">
 
               Frequently Asked Questions
 
             </h2>
 
+
             <div className="space-y-3">
 
-              <details className="group p-5 rounded-2xl bg-white/60 border border-slate-200 backdrop-blur-xl">
+
+              <details className="group rounded-2xl border border-slate-200 bg-white/60 p-5 backdrop-blur-xl">
 
                 <summary className="cursor-pointer text-sm font-semibold text-slate-950">
 
@@ -702,7 +685,7 @@ export const Home: React.FC<HomeProps> = ({
               </details>
 
 
-              <details className="group p-5 rounded-2xl bg-white/60 border border-slate-200 backdrop-blur-xl">
+              <details className="group rounded-2xl border border-slate-200 bg-white/60 p-5 backdrop-blur-xl">
 
                 <summary className="cursor-pointer text-sm font-semibold text-slate-950">
 
@@ -719,7 +702,7 @@ export const Home: React.FC<HomeProps> = ({
               </details>
 
 
-              <details className="group p-5 rounded-2xl bg-white/60 border border-slate-200 backdrop-blur-xl">
+              <details className="group rounded-2xl border border-slate-200 bg-white/60 p-5 backdrop-blur-xl">
 
                 <summary className="cursor-pointer text-sm font-semibold text-slate-950">
 
@@ -736,7 +719,7 @@ export const Home: React.FC<HomeProps> = ({
               </details>
 
 
-              <details className="group p-5 rounded-2xl bg-white/60 border border-slate-200 backdrop-blur-xl">
+              <details className="group rounded-2xl border border-slate-200 bg-white/60 p-5 backdrop-blur-xl">
 
                 <summary className="cursor-pointer text-sm font-semibold text-slate-950">
 
@@ -761,7 +744,9 @@ export const Home: React.FC<HomeProps> = ({
       </div>
 
 
-      <footer className="text-center text-xs text-slate-400 mt-12 mb-8 font-mono">
+      {/* ================= FOOTER ================= */}
+
+      <footer className="relative mt-4 mb-8 px-5 text-center font-mono text-xs text-slate-400">
 
         Duomation Workstation • Latency-optimized 2D Animation Protocol
 

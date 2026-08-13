@@ -24,7 +24,6 @@ import {
   Pencil,
   PenTool,
   Paintbrush,
-  RotateCw,
   Eraser,
   PaintBucket,
   Minus,
@@ -50,6 +49,7 @@ import {
   X,
   ChevronRight,
   Wrench,
+  RotateCw,
 } from 'lucide-react';
 
 interface DrawingWorkspaceProps {
@@ -113,7 +113,6 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   // Zoom & Pan state
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-const [canvasRotation, setCanvasRotation] = useState<0 | 90>(0);
 
   // Real-time Drawing state
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
@@ -148,6 +147,9 @@ const [canvasRotation, setCanvasRotation] = useState<0 | 90>(0);
       localStorage.setItem('duet_onboarding_dismissed', 'true');
     } catch (e) {}
   };
+
+  // Canvas Rotation (0, 90, 180, 270 degrees)
+  const [canvasRotation, setCanvasRotation] = useState<number>(0);
 
   // Pan & Spacebar State
   const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
@@ -321,6 +323,16 @@ const [canvasRotation, setCanvasRotation] = useState<0 | 90>(0);
         c: { tool: 'ellipse', label: 'Circle' },
       };
 
+      if ((e.shiftKey || e.altKey) && key === 'r') {
+        e.preventDefault();
+        setCanvasRotation((prev) => {
+          const next = (prev + 90) % 360;
+          showToast(next === 0 ? 'Canvas Orientation: Standard' : `Canvas Rotated: ${next}°`);
+          return next;
+        });
+        return;
+      }
+
       if (toolMap[key]) {
         e.preventDefault();
         setToolSettings((prev) => ({ ...prev, activeTool: toolMap[key].tool }));
@@ -342,43 +354,45 @@ const [canvasRotation, setCanvasRotation] = useState<0 | 90>(0);
     };
   }, [handleUndo, handleRedo, showToast]);
 
-  // Convert client pixel position into normalized [0..1] canvas point considering Pan and Zoom
-const getNormalizedPoint = useCallback(
-  (clientX: number, clientY: number, pressureVal: number = 0.5): Point => {
-    if (!canvasRef.current) {
-      return { x: 0, y: 0, pressure: pressureVal };
-    }
+  // Convert client pixel position into normalized [0..1] canvas point considering Pan, Zoom, and Rotation
+  const getNormalizedPoint = useCallback((clientX: number, clientY: number, pressureVal: number = 0.5): Point => {
+    if (!canvasRef.current) return { x: 0, y: 0, pressure: pressureVal };
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
 
-    const rect = canvasRef.current.getBoundingClientRect();
+    // Center of visual bounding box on screen
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
 
-    let rawX = (clientX - rect.left) / rect.width;
-    let rawY = (clientY - rect.top) / rect.height;
+    // Vector from center to pointer in client pixels
+    const dx = clientX - centerX;
+    const dy = clientY - centerY;
 
-    // Undo the visual canvas rotation before converting
-    // the pointer position into canvas coordinates.
-    if (canvasRotation === 90) {
-      const rotatedX = rawX;
-      const rotatedY = rawY;
+    // Rotate (dx, dy) back by -canvasRotation
+    const rad = (-canvasRotation * Math.PI) / 180;
+    const localDx = dx * Math.cos(rad) - dy * Math.sin(rad);
+    const localDy = dx * Math.sin(rad) + dy * Math.cos(rad);
 
-      rawX = rotatedY;
-      rawY = 1 - rotatedX;
-    }
+    // Unrotated display dimensions in CSS pixels
+    const dpr = window.devicePixelRatio || 1;
+    const unrotatedWidth = canvas.width / dpr;
+    const unrotatedHeight = canvas.height / dpr;
 
-    const normX =
-      (rawX - 0.5 - pan.x / rect.width) / zoom + 0.5;
+    // Raw normalized point on unrotated canvas before pan & zoom
+    const rawX = localDx / unrotatedWidth + 0.5;
+    const rawY = localDy / unrotatedHeight + 0.5;
 
-    const normY =
-      (rawY - 0.5 - pan.y / rect.height) / zoom + 0.5;
+    // Apply Pan and Zoom reversal
+    const normX = (rawX - 0.5 - pan.x / unrotatedWidth) / zoom + 0.5;
+    const normY = (rawY - 0.5 - pan.y / unrotatedHeight) / zoom + 0.5;
 
     return {
       x: Math.max(0, Math.min(1, normX)),
       y: Math.max(0, Math.min(1, normY)),
       pressure: pressureVal,
     };
-  },
-  [zoom, pan, canvasRotation]
-);
-    
+  }, [zoom, pan, canvasRotation]);
+
   // Subscribe to snapshot requests from Device B
   useEffect(() => {
     const unsubscribe = syncService.subscribe((event, data) => {
@@ -426,34 +440,9 @@ const getNormalizedPoint = useCallback(
 
     // Draw live brush/tool cursor overlay
     const ctx = canvasRef.current.getContext('2d');
-   if (ctx && cursorPosRef.current.visible) {
-  const rect = canvasRef.current.getBoundingClientRect();
-
-  let cursorX = cursorPosRef.current.x;
-  let cursorY = cursorPosRef.current.y;
-
-  if (canvasRotation === 90) {
-    const rawX = (cursorX - rect.left) / rect.width;
-    const rawY = (cursorY - rect.top) / rect.height;
-
-    // Convert the screen position back into the
-    // rotated canvas coordinate system.
-    cursorX = rect.left + rawY * rect.width;
-    cursorY = rect.top + (1 - rawX) * rect.height;
-  }
-
-  drawCursorOverlay(
-    ctx,
-    {
-      x: cursorX,
-      y: cursorY,
-      visible: true,
-    },
-    toolSettings,
-    zoom,
-    canvasRef.current
-  );
-}
+    if (ctx && cursorPosRef.current.visible) {
+      drawCursorOverlay(ctx, cursorPosRef.current, toolSettings, zoom, canvasRef.current, canvasRotation);
+    }
   }, [
     project,
     activeFrameIndex,
@@ -463,6 +452,7 @@ const getNormalizedPoint = useCallback(
     toolSettings,
     zoom,
     pan,
+    canvasRotation,
   ]);
 
   // Handle Resize and DPR
@@ -473,24 +463,24 @@ const getNormalizedPoint = useCallback(
     const rect = container.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
 
-    const baseAspect =
-  (project.settings?.width || 1920) /
-  (project.settings?.height || 1080);
+    const targetAspect = (project.settings?.width || 1920) / (project.settings?.height || 1080);
+    const isRotated90 = canvasRotation === 90 || canvasRotation === 270;
+    const effTargetAspect = isRotated90 ? 1 / targetAspect : targetAspect;
+    const containerAspect = rect.width / rect.height;
 
-const targetAspect = baseAspect;
+    let visualWidth = rect.width;
+    let visualHeight = rect.height;
 
-const containerAspect = rect.width / rect.height;
+    if (containerAspect > effTargetAspect) {
+      visualHeight = rect.height;
+      visualWidth = rect.height * effTargetAspect;
+    } else {
+      visualWidth = rect.width;
+      visualHeight = rect.width / effTargetAspect;
+    }
 
-let displayWidth = rect.width;
-let displayHeight = rect.height;
-
-if (containerAspect > targetAspect) {
-  displayHeight = rect.height;
-  displayWidth = rect.height * targetAspect;
-} else {
-  displayWidth = rect.width;
-  displayHeight = rect.width / targetAspect;
-}
+    const displayWidth = isRotated90 ? visualHeight : visualWidth;
+    const displayHeight = isRotated90 ? visualWidth : visualHeight;
 
     canvas.style.width = `${displayWidth}px`;
     canvas.style.height = `${displayHeight}px`;
@@ -498,12 +488,7 @@ if (containerAspect > targetAspect) {
     canvas.width = Math.round(displayWidth * dpr);
     canvas.height = Math.round(displayHeight * dpr);
     renderPass();
-  }, [
-  project.settings?.width,
-  project.settings?.height,
-  canvasRotation,
-  renderPass,
-]);
+  }, [project.settings?.width, project.settings?.height, canvasRotation, renderPass]);
 
   useEffect(() => {
     updateCanvasBounds();
@@ -1021,21 +1006,7 @@ if (containerAspect > targetAspect) {
 
         {/* Right: Undo/Redo & Export */}
         <div className="flex items-center gap-1 sm:gap-1.5">
-
- <button
-  onClick={() =>
-    setCanvasRotation((prev) => (prev === 0 ? 90 : 0))
-  }
-  className="p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all"
-  title="Rotate Canvas"
-  aria-label="Rotate Canvas"
->
-  <RotateCw
-    className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-500 ${
-      canvasRotation === 90 ? 'rotate-90' : 'rotate-0'
-    }`}
-  />
-</button>         <button
+          <button
             onClick={handleUndo}
             disabled={undoStack.length === 0}
             className="p-1.5 sm:p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 disabled:opacity-30 transition-colors"
@@ -1061,6 +1032,22 @@ if (containerAspect > targetAspect) {
             title="Export Animation"
           >
             <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          </button>
+
+          <button
+            onClick={() => {
+              const nextRot = (canvasRotation + 90) % 360;
+              setCanvasRotation(nextRot);
+              showToast(nextRot === 0 ? 'Canvas Orientation: Standard' : `Canvas Rotated: ${nextRot}°`);
+            }}
+            className={`p-1.5 sm:p-2 rounded-lg transition-colors flex items-center gap-1 ${
+              canvasRotation !== 0
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+            title="Rotate Canvas (Landscape / Orientation - Shift+R)"
+          >
+            <RotateCw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
           <button
@@ -1202,7 +1189,7 @@ if (containerAspect > targetAspect) {
               <input
                 type="range"
                 min={1}
-                max={200}
+                max={60}
                 value={toolSettings.size}
                 onChange={(e) => setToolSettings({ ...toolSettings, size: Number(e.target.value) })}
                 className="w-10 sm:w-20 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
@@ -1283,15 +1270,39 @@ if (containerAspect > targetAspect) {
           >
             <ChevronDown className="w-3.5 h-3.5 rotate-180" />
           </button>
-          {(zoom !== 1 || pan.x !== 0 || pan.y !== 0) && (
+
+          <div className="h-3.5 w-px bg-slate-800 mx-0.5" />
+
+          {/* Rotate Canvas Button */}
+          <button
+            onClick={() => {
+              const nextRot = (canvasRotation + 90) % 360;
+              setCanvasRotation(nextRot);
+              showToast(nextRot === 0 ? 'Canvas Orientation: Standard' : `Canvas Rotated: ${nextRot}°`);
+            }}
+            className={`p-1 rounded transition-colors flex items-center gap-1 ${
+              canvasRotation !== 0
+                ? 'bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600 hover:text-white font-medium'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Rotate Canvas Orientation (Shift+R)"
+          >
+            <RotateCw className="w-3.5 h-3.5" />
+            {canvasRotation !== 0 && (
+              <span className="text-[10px] font-mono font-bold">{canvasRotation}°</span>
+            )}
+          </button>
+
+          {(zoom !== 1 || pan.x !== 0 || pan.y !== 0 || canvasRotation !== 0) && (
             <button
               onClick={() => {
                 setZoom(1);
                 setPan({ x: 0, y: 0 });
-                showToast('Zoom Reset');
+                setCanvasRotation(0);
+                showToast('View Reset');
               }}
               className="ml-1 px-1.5 py-0.5 rounded bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600 hover:text-white text-[10px] font-semibold transition-colors"
-              title="Reset Zoom and Center Canvas"
+              title="Reset Zoom, Pan, and Canvas Rotation"
             >
               Reset
             </button>
@@ -1299,37 +1310,20 @@ if (containerAspect > targetAspect) {
         </div>
 
         {/* Dedicated Interactive Animation Canvas */}
-        <div
-  ref={containerRef}
-  className="relative w-full h-full min-h-0 flex items-center justify-center overflow-hidden p-0"
->
-      <div
-  className="relative flex items-center justify-center shrink-0"
-  style={{
-    width: '100%',
-    height: '100%',
-    maxWidth: '100%',
-    maxHeight: '100%',
-  }}
-> 
-  <canvas
-    ref={canvasRef}
-    onPointerDown={handlePointerDown}
-    onPointerMove={handlePointerMove}
-    onPointerUp={handlePointerUp}
-    onPointerCancel={handlePointerUp}
-    onPointerEnter={handlePointerEnter}
-    onPointerLeave={handlePointerLeave}
-    className="touch-none cursor-crosshair shadow-2xl rounded-lg"
-    style={{
-      width: '100%',
-      height: '100%',
-      transform: `rotate(${canvasRotation}deg)`,
-      transformOrigin: 'center center',
-      transition: 'transform 500ms ease',
-    }}
-  />
-</div>
+        <div ref={containerRef} className="w-full h-full flex items-center justify-center p-1 sm:p-2.5 landscape:p-0.5 overflow-hidden">
+          <canvas
+            ref={canvasRef}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            onPointerEnter={handlePointerEnter}
+            onPointerLeave={handlePointerLeave}
+            style={{ transform: `rotate(${canvasRotation}deg)` }}
+            className="object-contain touch-none cursor-crosshair shadow-2xl rounded-lg transition-transform duration-300 ease-out"
+          />
+        </div>
+      </div>
 
 
       {/* Bottom Timeline */}
@@ -1549,8 +1543,6 @@ if (containerAspect > targetAspect) {
           (project.layerFrames[`${activeLayerId}:${project.frames[activeFrameIndex]?.id}`] || []).length
         }
       />
-   </div>
-</div>
-</div>
-);
+    </div>
+  );
 };

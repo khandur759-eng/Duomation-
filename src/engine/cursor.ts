@@ -14,7 +14,8 @@ export function drawCursorOverlay(
   cursor: CursorPos,
   toolSettings: ToolSettings,
   zoom: number,
-  canvasElement: HTMLCanvasElement
+  canvasElement: HTMLCanvasElement,
+  rotation: number = 0
 ) {
   if (!cursor.visible) return;
 
@@ -28,9 +29,25 @@ export function drawCursorOverlay(
     return;
   }
 
-  // Convert client coordinates to canvas pixel coordinates
-  const px = ((cursor.x - rect.left) / rect.width) * canvasElement.width;
-  const py = ((cursor.y - rect.top) / rect.height) * canvasElement.height;
+  // Convert client coordinates to canvas pixel coordinates considering canvas rotation
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const dx = cursor.x - centerX;
+  const dy = cursor.y - centerY;
+
+  const rad = (-rotation * Math.PI) / 180;
+  const localDx = dx * Math.cos(rad) - dy * Math.sin(rad);
+  const localDy = dx * Math.sin(rad) + dy * Math.cos(rad);
+
+  const dpr = window.devicePixelRatio || 1;
+  const unrotatedWidth = canvasElement.width / dpr;
+  const unrotatedHeight = canvasElement.height / dpr;
+
+  const rawX = localDx / unrotatedWidth + 0.5;
+  const rawY = localDy / unrotatedHeight + 0.5;
+
+  const px = rawX * canvasElement.width;
+  const py = rawY * canvasElement.height;
 
   // Base brush width in canvas pixels
   const baseWidth = Math.max(1, toolSettings.size * (canvasElement.height / 800));

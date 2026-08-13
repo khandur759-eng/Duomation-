@@ -254,7 +254,13 @@ export const PairingModal: React.FC<PairingModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-      <div className="relative w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 p-6 text-slate-100 shadow-2xl">
+      <div
+        className={`relative w-full max-w-md overflow-hidden rounded-[2rem] border p-6 shadow-[0_30px_90px_rgba(15,23,42,0.30)] ${
+          role === 'display'
+            ? 'border-white/80 bg-white text-slate-900 shadow-indigo-950/20'
+            : 'border-slate-800 bg-slate-900 text-slate-100'
+        }`}
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 rounded-full p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
@@ -379,157 +385,72 @@ export const PairingModal: React.FC<PairingModalProps> = ({
           </div>
         ) : (
           /* Device B View: Authoritative for DISPLAY role or general join */
-         <div className="space-y-5">
-  {scanMode ? (
-    <div className="space-y-4">
+          <div className="space-y-5">
+            {scanMode ? (
+              <div className="space-y-3">
+                <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-black border border-slate-700 flex items-center justify-center">
+                  <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+                  <canvas ref={canvasRef} className="hidden" />
+                  <div className="absolute inset-0 border-2 border-indigo-500/50 rounded-xl pointer-events-none animate-pulse" />
+                </div>
+                {scanError && (
+                  <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-xl text-rose-300 text-xs">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                    <span>{scanError}</span>
+                  </div>
+                )}
+                <button
+                  onClick={() => setScanMode(false)}
+                  className="w-full py-2.5 rounded-xl bg-slate-800 text-slate-300 text-sm font-medium hover:bg-slate-700 transition-colors"
+                >
+                  Use Manual 6-Digit Code Instead
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <button
+                  onClick={() => {
+                    setScanError(null);
+                    setScanMode(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-lg shadow-indigo-600/20 transition-all"
+                >
+                  <Camera className="w-5 h-5" />
+                  Scan QR Code with Camera
+                </button>
 
-      {/* QR Scanner */}
-      <div className="relative aspect-square w-full overflow-hidden rounded-[1.5rem] bg-slate-950 border border-indigo-400/20 shadow-[0_20px_60px_rgba(79,70,229,0.18)]">
-        <video
-          ref={videoRef}
-          className="w-full h-full object-cover"
-          playsInline
-          muted
-        />
+                <div className="relative flex items-center justify-center">
+                  <div className="border-t border-slate-800 w-full" />
+                  <span className="bg-slate-900 px-3 text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                    OR
+                  </span>
+                </div>
 
-        <canvas ref={canvasRef} className="hidden" />
-
-        {/* Scanner frame */}
-        <div className="absolute inset-5 rounded-[1.25rem] border-2 border-indigo-400/60 pointer-events-none">
-          <div className="absolute left-1/2 top-0 h-1 w-20 -translate-x-1/2 rounded-full bg-indigo-400 shadow-[0_0_20px_rgba(129,140,248,0.9)]" />
-        </div>
-      </div>
-
-      {scanError && (
-        <div className="flex items-center gap-3 rounded-2xl border border-rose-300/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
-          <AlertTriangle className="w-4 h-4 shrink-0 text-rose-300" />
-          <span>{scanError}</span>
-        </div>
-      )}
-
-      <button
-        onClick={() => setScanMode(false)}
-        className="w-full rounded-2xl border border-slate-700 bg-slate-900/80 py-3 text-sm font-medium text-slate-300 transition-all hover:bg-slate-800 hover:border-slate-600"
-      >
-        Use Manual 6-Digit Code Instead
-      </button>
-    </div>
-  ) : (
-    <div className="space-y-5">
-
-      {/* QR / Camera primary action */}
-      <button
-        onClick={() => {
-          setScanError(null);
-          setScanMode(true);
-        }}
-        className="
-          group relative w-full overflow-hidden rounded-[1.4rem]
-          bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500
-          p-[1px] shadow-[0_18px_45px_rgba(99,102,241,0.28)]
-          transition-all duration-300
-          hover:-translate-y-0.5 hover:shadow-[0_24px_55px_rgba(99,102,241,0.38)]
-          active:translate-y-0
-        "
-      >
-        <div className="relative flex items-center justify-center gap-3 rounded-[1.35rem] bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 px-5 py-4 text-white">
-
-          {/* Floating camera icon */}
-         <span className="
-  relative flex h-12 w-12 items-center justify-center rounded-2xl
-  bg-white
-  text-indigo-600
-  border border-white/70
-  shadow-[0_10px_30px_rgba(15,23,42,0.22)]
-  transition-all duration-500
-  group-hover:-translate-y-1.5
-  group-hover:rotate-2
-  group-hover:shadow-[0_16px_38px_rgba(15,23,42,0.28)]
-"> 
-            <Camera className="h-5 w-5" />
-          </span>
-
-          <span className="text-base font-semibold">
-            Scan QR Code with Camera
-          </span>
-        </div>
-      </button>
-
-      {/* OR divider */}
-      <div className="relative flex items-center justify-center py-1">
-        <div className="h-px w-full bg-slate-200/80" />
-
-        <span className="
-          absolute rounded-full
-          bg-white px-4
-          text-[11px] font-bold uppercase tracking-[0.22em]
-          text-slate-400
-        ">
-          OR
-        </span>
-      </div>
-
-      {/* Manual code */}
-      <form onSubmit={handleManualSubmit} className="space-y-4">
-
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-700">
-            Enter 6-Character Pair Code
-          </label>
-
-          <input
-            type="text"
-            value={manualCode}
-            onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-            placeholder="E.G. K9X2P4"
-            maxLength={8}
-            className="
-              w-full rounded-2xl
-              border border-slate-200
-              bg-slate-50
-              px-4 py-4
-              text-center text-xl font-mono font-semibold
-              tracking-[0.28em]
-              text-slate-900
-              placeholder:text-slate-400
-              shadow-inner
-              outline-none
-              transition-all
-              focus:border-indigo-400
-              focus:bg-white
-              focus:ring-4
-              focus:ring-indigo-500/10
-            "
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={manualCode.trim().length < 4}
-          className="
-            group relative w-full overflow-hidden rounded-2xl
-            bg-slate-900
-            py-4
-            text-white
-            font-semibold
-            shadow-[0_12px_30px_rgba(15,23,42,0.18)]
-            transition-all duration-300
-            hover:bg-indigo-600
-            hover:-translate-y-0.5
-            disabled:cursor-not-allowed
-            disabled:opacity-40
-            disabled:hover:translate-y-0
-          "
-        >
-          <span className="relative z-10">
-            Connect as Display Monitor
-          </span>
-        </button>
-
-      </form>
-    </div>
-  )}
-</div>
+                <form onSubmit={handleManualSubmit} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                      Enter 6-Character Pair Code:
+                    </label>
+                    <input
+                      type="text"
+                      value={manualCode}
+                      onChange={(e) => setManualCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. K9X2P4"
+                      maxLength={8}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-center text-xl font-mono tracking-widest text-white uppercase focus:outline-none focus:border-indigo-500 transition-colors"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={manualCode.trim().length < 4}
+                    className="w-full py-3 rounded-xl bg-slate-800 hover:bg-indigo-600 disabled:opacity-40 text-white font-medium transition-colors"
+                  >
+                    Connect as Display Monitor
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

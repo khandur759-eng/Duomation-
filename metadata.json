@@ -1,5 +1,5 @@
 {
-  "name": "Duomation 2D Animation Workstation",
+  "name": "Duet 2D Animation Workstation",
   "description": "Professional two-device 2D animation workstation syncing drawing and display controls seamlessly in real time.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

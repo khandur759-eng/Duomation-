@@ -435,13 +435,17 @@ export const PairingModal: React.FC<PairingModalProps> = ({
         <div className="relative flex items-center justify-center gap-3 rounded-[1.35rem] bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 px-5 py-4 text-white">
 
           {/* Floating camera icon */}
-          <span className="
-            flex h-11 w-11 items-center justify-center rounded-2xl
-            bg-white/15 border border-white/25
-            shadow-[0_8px_25px_rgba(0,0,0,0.18)]
-            transition-transform duration-300
-            group-hover:-translate-y-1
-          ">
+         <span className="
+  relative flex h-12 w-12 items-center justify-center rounded-2xl
+  bg-white
+  text-indigo-600
+  border border-white/70
+  shadow-[0_10px_30px_rgba(15,23,42,0.22)]
+  transition-all duration-500
+  group-hover:-translate-y-1.5
+  group-hover:rotate-2
+  group-hover:shadow-[0_16px_38px_rgba(15,23,42,0.28)]
+"> 
             <Camera className="h-5 w-5" />
           </span>
 

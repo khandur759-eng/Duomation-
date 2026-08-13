@@ -1549,6 +1549,8 @@ if (containerAspect > targetAspect) {
           (project.layerFrames[`${activeLayerId}:${project.frames[activeFrameIndex]?.id}`] || []).length
         }
       />
-    </div>
-  );
+   </div>
+</div>
+</div>
+);
 };

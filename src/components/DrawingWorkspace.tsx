@@ -1192,7 +1192,7 @@ const getNormalizedPoint = useCallback(
               <input
                 type="range"
                 min={1}
-                max={60}
+                max={200}
                 value={toolSettings.size}
                 onChange={(e) => setToolSettings({ ...toolSettings, size: Number(e.target.value) })}
                 className="w-10 sm:w-20 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"

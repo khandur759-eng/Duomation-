@@ -1289,7 +1289,10 @@ const getNormalizedPoint = useCallback(
         </div>
 
         {/* Dedicated Interactive Animation Canvas */}
-        <div ref={containerRef} className="w-full h-full flex items-center justify-center p-1 sm:p-2.5 landscape:p-0.5">
+        <div
+  ref={containerRef}
+  className="relative w-full h-full min-h-0 flex items-center justify-center overflow-hidden p-0"
+>
           <canvas
             ref={canvasRef}
             onPointerDown={handlePointerDown}

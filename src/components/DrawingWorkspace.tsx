@@ -477,9 +477,7 @@ const getNormalizedPoint = useCallback(
   (project.settings?.width || 1920) /
   (project.settings?.height || 1080);
 
-const targetAspect = canvasRotation === 90
-  ? 1 / baseAspect
-  : baseAspect;
+const targetAspect = baseAspect;
 
 const containerAspect = rect.width / rect.height;
 

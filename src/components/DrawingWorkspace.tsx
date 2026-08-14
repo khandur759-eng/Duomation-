@@ -1178,12 +1178,15 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
               </div>
             </aside>
           ) : (
-            <aside className="hidden md:flex absolute top-4 left-4 z-20 flex-col items-center gap-1.5 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md p-2 rounded-2xl shadow-2xl max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
-              <div className="w-full flex items-center justify-between pb-1 border-b border-slate-800/80 mb-0.5 px-0.5">
+            <aside className="hidden md:flex absolute top-4 left-4 z-20 flex-col items-center gap-1.5 bg-white/90
+border-slate-200/80
+shadow-xl
+max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
+              <div className="w-full flex items-center justify-between pb-1 border-b border-slate-200/80 mb-0.5 px-0.5">
                 <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">Tools</span>
                 <button
                   onClick={() => setIsLeftToolsMinimized(true)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  className="p-1 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
                   title="Minimize Tools Panel"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
@@ -1208,7 +1211,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
                 { id: 'ellipse', label: 'Circle (Key: C)', icon: Circle },
               ].map((item) => {
                 if ('isDivider' in item) {
-                  return <div key={item.id} className="w-6 h-px bg-slate-800 my-0.5" />;
+                  return <div key={item.id} className="w-6 h-px bg-slate-200 my-0.5" />;
                 }
                 const Icon = item.icon;
                 const isActive = toolSettings.activeTool === item.id;
@@ -1222,12 +1225,12 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
                     className={`p-2.5 rounded-xl transition-all relative group ${
                       isActive
                         ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                        : 'text-slate-500 hover:text-slate-600 hover:bg-slate-50'
                     }`}
                     title={item.label}
                   >
                     <Icon className="w-5 h-5" />
-                    <span className="absolute left-full ml-3 px-2 py-1 bg-slate-800 text-slate-100 text-[10px] font-medium rounded-md shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-30">
+                    <span className="absolute left-full ml-3 px-2 py-1 bg-slate-950 text-white text-[10px] font-medium rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-30"
                       {item.label}
                     </span>
                   </button>

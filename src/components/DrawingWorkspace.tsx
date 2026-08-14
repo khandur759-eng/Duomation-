@@ -985,12 +985,12 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
 
       {/* Top Header Bar */}
       {!isFullScreenCanvas && (
-        <header className="h-12 sm:h-14 px-3 sm:px-6 bg-slate-900 border-b border-slate-800/90 flex items-center justify-between z-20 gap-4">
+       <header className="h-12 sm:h-14 px-3 sm:px-6 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 flex items-center justify-between z-20 gap-4 shadow-sm">
           {/* Left: Home Icon + QR Code / Pair Screen Tool right next to it */}
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={onReturnHome}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
+              className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors flex-shrink-0"
               title="Return to Home"
             >
               <Home className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -1019,7 +1019,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
           {/* Right: Undo/Redo, Export, Canvas Rotation, Fullscreen & Diagnostics */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Undo / Redo Group */}
-            <div className="flex items-center bg-slate-950/60 border border-slate-800/80 rounded-xl p-0.5">
+           <div className="flex items-center bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-xl p-0.5 shadow-sm">
               <button
                 onClick={handleUndo}
                 disabled={undoStack.length === 0}
@@ -1043,7 +1043,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
 
             <button
               onClick={() => setIsExportOpen(true)}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors flex items-center gap-1.5 text-xs font-medium"
+              className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors flex items-center gap-1.5 text-xs font-medium shadow-sm"
               title="Export Animation"
             >
               <Download className="w-4 h-4" />
@@ -1059,7 +1059,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
               className={`p-2 rounded-xl transition-colors flex items-center gap-1 ${
                 canvasRotation !== 0
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                  : 'bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 shadow-sm'
               }`}
               title="Rotate Canvas Orientation (Shift+R)"
             >
@@ -1074,7 +1074,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
                 setIsFullScreenCanvas(true);
                 showToast('Full-Screen Canvas Active');
               }}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            className="p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-colors shadow-sm"
               title="Full-Screen Canvas Mode (Shift+F)"
             >
               <Maximize2 className="w-4 h-4" />
@@ -1094,7 +1094,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
       )}
 
       {/* Main Workspace Area */}
-      <div className="relative flex-1 w-full bg-slate-950 flex items-center justify-center overflow-hidden">
+      <div className="relative flex-1 w-full bg-[#f6f7fb] flex items-center justify-center overflow-hidden">
         {/* Floating Discreet Exit Fullscreen Button */}
         {isFullScreenCanvas && (
           <button

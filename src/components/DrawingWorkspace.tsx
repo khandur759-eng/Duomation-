@@ -955,7 +955,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   };
 
   return (
-    <div className="relative w-screen h-screen bg-slate-950 text-slate-100 flex flex-col justify-between overflow-hidden select-none pl-safe pr-safe pt-safe pb-safe">
+   <div className="relative w-screen h-screen bg-[#f6f7fb] text-slate-950 flex flex-col justify-between overflow-hidden select-none pl-safe pr-safe pt-safe pb-safe">
       {/* Toast Notification Banner */}
       {toastMessage && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-indigo-600 text-white text-xs font-semibold shadow-2xl border border-indigo-400/30 animate-in fade-in zoom-in duration-200 flex items-center gap-2">

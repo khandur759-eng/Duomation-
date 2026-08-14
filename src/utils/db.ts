@@ -137,6 +137,12 @@ export async function listAllProjects(): Promise<Array<{ id: string; name: strin
   }
 
   // Fetch Supabase Cloud Projects and merge
+    
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    localProjects.sort((a, b) => b.updatedAt - a.updatedAt);
+    return localProjects;
+  }
+
   try {
     const supabaseList = await listSupabaseProjects();
     const map = new Map<string, { id: string; name: string; updatedAt: number; frameCount: number }>();

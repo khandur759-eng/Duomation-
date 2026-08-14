@@ -1230,7 +1230,7 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                     title={item.label}
                   >
                     <Icon className="w-5 h-5" />
-                    <span className="absolute left-full ml-3 px-2 py-1 bg-slate-950 text-white text-[10px] font-medium rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-30"
+                    <span className="absolute left-full ml-3 px-2 py-1 bg-slate-950 text-white text-[10px] font-medium rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-30">
                       {item.label}
                     </span>
                   </button>

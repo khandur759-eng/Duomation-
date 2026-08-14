@@ -1225,7 +1225,7 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                     className={`p-2.5 rounded-xl transition-all relative group ${
                       isActive
                         ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105'
-                        : 'text-slate-500 hover:text-slate-600 hover:bg-slate-50'
+                        : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'
                     }`}
                     title={item.label}
                   >

@@ -196,12 +196,12 @@ export const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
         </div>
 
         {/* Tab Contents */}
-        <div className="p-6 max-h-[360px] overflow-y-auto space-y-6 custom-scrollbar">
+       <div className="p-6 max-h-[360px] overflow-y-auto space-y-6 custom-scrollbar bg-white">
           {activeTab === 'presets' && (
             <div className="space-y-5">
               {PRESET_PALETTES.map((palette) => (
                 <div key={palette.name} className="space-y-2">
-                  <span className="text-xs font-medium text-slate-300">{palette.name}</span>
+                  <span className="text-xs font-medium text-slate-700">{palette.name}</span>
                   <div className="grid grid-cols-6 sm:grid-cols-12 gap-2">
                     {palette.colors.map((color) => {
                       const isSelected = selectedHex.toLowerCase() === color.toLowerCase();

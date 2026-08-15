@@ -209,15 +209,25 @@ export const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
                         <button
                           key={color}
                           onClick={() => handleColorChange(color)}
-                          className={`w-7 h-7 rounded-xl border flex items-center justify-center transition-all hover:scale-110 active:scale-95 ${
-                            isSelected
-  ? 'border-white ring-2 ring-indigo-500/50 scale-105 z-10'
-  : 'border-slate-300 hover:border-indigo-300'
-                          }`}
-                          style={{ backgroundColor: color }}
+                          
+                         className={`w-9 h-9 rounded-2xl border flex items-center justify-center
+  transition-all duration-200 hover:scale-110 hover:shadow-md active:scale-95
+  ${isSelected
+    ? 'border-white ring-2 ring-indigo-500 ring-offset-2 ring-offset-white scale-110 z-10 shadow-lg'
+    : 'border-slate-300/80 shadow-sm hover:border-indigo-400'
+  }`}
+ style={{ backgroundColor: color }}
                           title={color}
                         >
-                          {isSelected && <Check className={`w-3.5 h-3.5 ${color === '#FFFFFF' || color === '#FFF0EB' ? 'text-black' : 'text-white'}`} />}
+                          {isSelected && (
+  <Check
+    className={`w-4 h-4 drop-shadow-sm ${
+      color === '#FFFFFF' || color === '#FFF0EB'
+        ? 'text-black'
+        : 'text-white'
+    }`}
+  />
+)}
                         </button>
                       );
                     })}

@@ -1322,14 +1322,14 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
               {/* Size Slider (0 to 200) */}
               {toolSettings.activeTool !== 'eyedropper' && toolSettings.activeTool !== 'fill' && (
                 <div className="flex items-center gap-1 sm:gap-2">
-                  <span className="text-[10px] font-mono text-slate-800 hidden sm:inline">Size</span>
+                  <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">Size</span>
                   <input
                     type="range"
                     min={1}
                     max={200}
                     value={toolSettings.size}
                     onChange={(e) => setToolSettings({ ...toolSettings, size: Number(e.target.value) })}
-                    className="w-12 sm:w-24 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                    className="w-12 sm:w-24 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                   />
                   <span className="text-[10px] font-mono text-slate-300 w-5 sm:w-7 text-right">
                     {toolSettings.size}

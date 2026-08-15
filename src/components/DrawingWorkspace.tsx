@@ -1724,9 +1724,9 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
 
             {/* Mobile Tool Size Adjustment (1 to 200) */}
             {toolSettings.activeTool !== 'eyedropper' && toolSettings.activeTool !== 'fill' && (
-              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 space-y-1.5">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-slate-300">Stroke Size</span>
+             <span className="font-semibold text-slate-700">Stroke Size</span> 
                   <span className="font-mono text-indigo-400 font-bold">{toolSettings.size}px</span>
                 </div>
                 <input
@@ -1735,7 +1735,7 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                   max={200}
                   value={toolSettings.size}
                   onChange={(e) => setToolSettings({ ...toolSettings, size: Number(e.target.value) })}
-                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                 />
               </div>
             )}

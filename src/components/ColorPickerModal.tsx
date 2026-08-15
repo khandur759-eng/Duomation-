@@ -121,7 +121,7 @@ export const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
         </div>
 
         {/* Current Color Bar & Eyedropper CTA */}
-        <div className="px-6 py-4 bg-slate-950/60 border-b border-slate-800/80 flex items-center justify-between">
+        <className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
               className="w-12 h-12 rounded-2xl border-2 border-slate-700 shadow-lg relative overflow-hidden"
@@ -134,7 +134,7 @@ export const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
                   type="text"
                   value={selectedHex.toUpperCase()}
                   onChange={(e) => handleColorChange(e.target.value)}
-                  className="bg-slate-800 border border-slate-700 font-mono text-xs font-semibold text-white px-2.5 py-1 rounded-lg w-24 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="bg-slate-100 border border-slate-300 font-mono text-xs font-semibold text-slate-800 px-2.5 py-1 rounded-lg w-24 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
             </div>
@@ -143,7 +143,7 @@ export const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleNativeEyedropper}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-all active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium border border-slate-700 transition-all active:scale-95"
               title="Pick color from screen or canvas"
             >
               <Pipette className="w-4 h-4 text-indigo-400" />
@@ -162,7 +162,7 @@ export const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-800 px-6 bg-slate-900">
+        <div className="flex border-b border-slate-200 px-6 bg-white">
           <button
             onClick={() => setActiveTab('presets')}
             className={`py-3 px-4 text-xs font-semibold border-b-2 transition-colors ${

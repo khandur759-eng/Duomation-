@@ -121,7 +121,7 @@ export const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
         </div>
 
         {/* Current Color Bar & Eyedropper CTA */}
-        <className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between">
+        <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
               className="w-12 h-12 rounded-2xl border-2 border-slate-700 shadow-lg relative overflow-hidden"

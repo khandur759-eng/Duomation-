@@ -1295,12 +1295,12 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                     className="w-4 h-4 sm:w-6 sm:h-6 rounded-lg border border-slate-600 shadow-inner flex items-center justify-center transition-transform group-hover:scale-105"
                     style={{ backgroundColor: toolSettings.color }}
                   />
-                  <Palette className="w-3 h-3 sm:w-4 sm:h-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+                <Palette className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 group-hover:text-indigo-600 transition-colors" />
                   <span className="hidden lg:inline text-[11px] font-mono text-slate-300 uppercase">{toolSettings.color}</span>
                 </button>
 
                 {/* Quick Palette Swatches */}
-                <div className="hidden sm:flex items-center gap-1 bg-slate-950/50 p-1 rounded-xl border border-slate-800">
+               <div className="hidden sm:flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-sm">
                   {['#000000', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#FFFFFF'].map((c) => (
                     <button
                       key={c}
@@ -1308,7 +1308,7 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                       className={`w-4 h-4 sm:w-5 sm:h-5 rounded-lg border transition-all ${
                         toolSettings.color.toLowerCase() === c.toLowerCase()
                           ? 'border-white scale-110 z-10 shadow'
-                          : 'border-slate-800 hover:border-slate-600 hover:scale-105'
+                           :border-slate-300 hover:border-indigo-300 hover:scale-105
                       }`}
                       style={{ backgroundColor: c }}
                       title={c}

@@ -1242,7 +1242,7 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
 
         {/* Mobile Compact Tool Selector Pill */}
         {!isFullScreenCanvas && (
-          <div className="flex md:hidden absolute top-2 left-2 sm:top-3 sm:left-3 z-20 flex-col items-center gap-1.5 bg-slate-900/95 border border-slate-800 backdrop-blur-md p-1.5 rounded-2xl shadow-xl">
+         <div className="flex md:hidden absolute top-2 left-2 sm:top-3 sm:left-3 z-20 flex-col items-center gap-1.5 bg-white/95 border border-slate-200 backdrop-blur-md p-1.5 rounded-2xl shadow-xl">
             <button
               onClick={() => setIsMobileToolsOpen(true)}
               className="p-2 rounded-xl bg-indigo-600 text-white shadow active:scale-95 transition-transform"

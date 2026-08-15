@@ -1710,11 +1710,11 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
  'bg-slate-50 border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200'
                     }`}
                   >
-                    <div className={`p-2 rounded-xl flex-shrink-0 ${isActive ? 'bg-white/20' : 'bg-slate-900 text-indigo-400'}`}>
+                   <div className={`p-2 rounded-xl flex-shrink-0 ${isActive ? 'bg-white/20' : 'bg-indigo-50 text-indigo-600'}`}>
                       <Icon className="w-4 h-4" />
                     </div>
                     <div className="truncate">
-                      <div className="font-semibold text-xs text-white truncate">{tool.label}</div>
+                     <div className="font-semibold text-xs text-slate-800 truncate">{tool.label}</div>
                       <div className={`text-[10px] truncate ${isActive ? 'text-indigo-100' : 'text-slate-500'}`}>{tool.desc}</div>
                     </div>
                   </button>

@@ -171,43 +171,44 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, proje
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 pl-safe pr-safe pt-safe pb-safe">
-      <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto custom-scrollbar rounded-2xl bg-slate-900 border border-slate-800 p-5 sm:p-6 text-slate-100 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-md p-3 sm:p-4 pl-safe pr-safe pt-safe pb-safe animate-in fade-in duration-200">
+      <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto custom-scrollbar rounded-[2rem] bg-white/95 border border-slate-200/90 p-6 sm:p-7 text-slate-900 shadow-[0_30px_90px_rgba(15,23,42,0.18)] backdrop-blur-2xl">
         <button
           onClick={onClose}
           disabled={exporting}
-          className="absolute top-4 right-4 rounded-full p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-30"
+          className="absolute top-5 right-5 rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors disabled:opacity-30"
+          title="Close dialog"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="text-center mb-5">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 mb-3">
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 mb-3 shadow-xs">
             <Download className="w-6 h-6" />
           </div>
-          <h2 className="text-xl font-semibold text-white">Export Animation</h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <h2 className="text-xl font-bold text-slate-950">Export Animation</h2>
+          <p className="text-xs text-slate-500 mt-1">
             Download your 2D animation project in professional formats.
           </p>
         </div>
 
         {completedMessage && (
-          <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium flex items-center gap-2">
-            <Check className="w-4 h-4 flex-shrink-0" />
+          <div className="mb-4 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-2.5 shadow-xs">
+            <Check className="w-4 h-4 flex-shrink-0 text-emerald-600" />
             <span>{completedMessage}</span>
           </div>
         )}
 
         {exporting ? (
           <div className="py-6 text-center space-y-4">
-            <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
+            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
             <div className="space-y-1">
-              <p className="text-sm font-medium text-white">{exportStatusText}</p>
-              <p className="text-xs text-slate-400">{exportProgress}% Completed</p>
+              <p className="text-sm font-bold text-slate-900">{exportStatusText}</p>
+              <p className="text-xs font-mono font-bold text-slate-500">{exportProgress}% Completed</p>
             </div>
-            <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
               <div
-                className="bg-indigo-500 h-full transition-all duration-200"
+                className="bg-gradient-to-r from-indigo-600 to-violet-600 h-full transition-all duration-200"
                 style={{ width: `${exportProgress}%` }}
               />
             </div>
@@ -216,40 +217,40 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, proje
           <div className="space-y-3">
             <button
               onClick={handleExportWebM}
-              className="w-full p-3.5 sm:p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-indigo-500/80 hover:bg-slate-900/80 flex items-center gap-3 text-left transition-all group"
+              className="w-full p-4 rounded-2xl bg-white border-2 border-slate-200/90 hover:border-indigo-400 hover:bg-indigo-50/30 flex items-center gap-3.5 text-left transition-all group shadow-xs hover:shadow-md active:scale-98 cursor-pointer"
             >
-              <div className="p-2.5 rounded-lg bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+              <div className="p-3 rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 group-hover:bg-gradient-to-r group-hover:from-indigo-600 group-hover:to-violet-600 group-hover:text-white transition-all shadow-xs">
                 <Film className="w-5 h-5" />
               </div>
               <div className="flex-1">
-                <h4 className="text-sm font-semibold text-white">WebM Video File</h4>
-                <p className="text-xs text-slate-400">Smooth video clip ({project.settings.fps} FPS)</p>
+                <h4 className="text-sm font-bold text-slate-950">WebM Video File</h4>
+                <p className="text-xs text-slate-500 font-medium">Smooth video clip ({project.settings.fps} FPS)</p>
               </div>
             </button>
 
             <button
               onClick={handleExportPNGSequence}
-              className="w-full p-3.5 sm:p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-indigo-500/80 hover:bg-slate-900/80 flex items-center gap-3 text-left transition-all group"
+              className="w-full p-4 rounded-2xl bg-white border-2 border-slate-200/90 hover:border-emerald-400 hover:bg-emerald-50/30 flex items-center gap-3.5 text-left transition-all group shadow-xs hover:shadow-md active:scale-98 cursor-pointer"
             >
-              <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+              <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 group-hover:bg-gradient-to-r group-hover:from-emerald-600 group-hover:to-teal-600 group-hover:text-white transition-all shadow-xs">
                 <ImageIcon className="w-5 h-5" />
               </div>
               <div className="flex-1">
-                <h4 className="text-sm font-semibold text-white">PNG Sequence (ZIP)</h4>
-                <p className="text-xs text-slate-400">Single ZIP containing high-res transparent PNGs</p>
+                <h4 className="text-sm font-bold text-slate-950">PNG Sequence (ZIP)</h4>
+                <p className="text-xs text-slate-500 font-medium">Single ZIP containing high-res transparent PNGs</p>
               </div>
             </button>
 
             <button
               onClick={handleExportJSON}
-              className="w-full p-3.5 sm:p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-indigo-500/80 hover:bg-slate-900/80 flex items-center gap-3 text-left transition-all group"
+              className="w-full p-4 rounded-2xl bg-white border-2 border-slate-200/90 hover:border-amber-400 hover:bg-amber-50/30 flex items-center gap-3.5 text-left transition-all group shadow-xs hover:shadow-md active:scale-98 cursor-pointer"
             >
-              <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-400 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+              <div className="p-3 rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-100 group-hover:bg-gradient-to-r group-hover:from-amber-600 group-hover:to-orange-600 group-hover:text-white transition-all shadow-xs">
                 <FileCode className="w-5 h-5" />
               </div>
               <div className="flex-1">
-                <h4 className="text-sm font-semibold text-white">Project JSON Backup</h4>
-                <p className="text-xs text-slate-400">Structured project file to transfer or load later</p>
+                <h4 className="text-sm font-bold text-slate-950">Project JSON Backup</h4>
+                <p className="text-xs text-slate-500 font-medium">Structured project file to transfer or load later</p>
               </div>
             </button>
           </div>

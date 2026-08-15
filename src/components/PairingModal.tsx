@@ -253,29 +253,24 @@ export const PairingModal: React.FC<PairingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-      <div
-        className={`relative w-full max-w-md overflow-hidden rounded-[2rem] border p-6 shadow-[0_30px_90px_rgba(15,23,42,0.30)] ${
-          role === 'display'
-            ? 'border-white/80 bg-white text-slate-900 shadow-indigo-950/20'
-            : 'border-slate-800 bg-slate-900 text-slate-100'
-        }`}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-md p-4 animate-in fade-in duration-200">
+      <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-slate-200/90 bg-white/95 text-slate-900 backdrop-blur-2xl p-6 sm:p-7 shadow-[0_30px_90px_rgba(15,23,42,0.18)]">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 rounded-full p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+          className="absolute top-5 right-5 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+          title="Close dialog"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="text-center mb-5">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 mb-3">
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-13 h-13 rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100/80 mb-3 shadow-xs">
             <QrCode className="w-6 h-6" />
           </div>
-          <h2 className="text-xl font-semibold text-white">
+          <h2 className="text-xl font-bold tracking-tight text-slate-950">
             {role === 'draw' ? 'Pair Display Monitor (Device B)' : 'Connect as Display Monitor'}
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">
             {role === 'draw'
               ? 'Scan with Device B or enter the pairing code to stream drawing live.'
               : 'Scan the QR code on Device A or enter its 6-character pair code.'}
@@ -287,20 +282,20 @@ export const PairingModal: React.FC<PairingModalProps> = ({
           <div className="space-y-5">
             {/* Case 1: Session creation error */}
             {sessionError ? (
-              <div className="flex flex-col items-center justify-center bg-rose-500/10 border border-rose-500/20 rounded-xl p-5 text-center space-y-3">
-                <WifiOff className="w-8 h-8 text-rose-400" />
+              <div className="flex flex-col items-center justify-center bg-rose-50 border border-rose-200 rounded-2xl p-5 text-center space-y-3">
+                <WifiOff className="w-8 h-8 text-rose-500" />
                 <div>
-                  <h3 className="text-sm font-semibold text-rose-200">Pairing Service Unavailable</h3>
-                  <p className="text-xs text-rose-300/80 mt-1">{sessionError}</p>
+                  <h3 className="text-sm font-bold text-rose-900">Pairing Service Unavailable</h3>
+                  <p className="text-xs text-rose-700 mt-1">{sessionError}</p>
                 </div>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-500">
                   Please check your internet connection and try reconnecting.
                 </p>
                 {onRetryCreateSession && (
                   <button
                     onClick={onRetryCreateSession}
                     disabled={isCreatingSession}
-                    className="flex items-center gap-2 py-2 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow transition-all active:scale-95 disabled:opacity-50"
+                    className="flex items-center gap-2 py-2 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-semibold shadow-md shadow-rose-500/20 transition-all active:scale-95 disabled:opacity-50"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isCreatingSession ? 'animate-spin' : ''}`} />
                     {isCreatingSession ? 'Connecting...' : 'Retry Connection'}
@@ -309,29 +304,29 @@ export const PairingModal: React.FC<PairingModalProps> = ({
               </div>
             ) : isCreatingSession || qrState === 'waiting-for-session' || (!code && !sessionError) ? (
               /* Case 2: Waiting for session creation */
-              <div className="flex flex-col items-center justify-center bg-slate-950/80 rounded-xl p-8 border border-slate-800/80 text-center space-y-3">
-                <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+              <div className="flex flex-col items-center justify-center bg-slate-50/80 rounded-2xl p-8 border border-slate-200/80 text-center space-y-3 shadow-inner">
+                <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-200">Creating Secure Pairing Session</h3>
-                  <p className="text-xs text-slate-400 mt-1">Connecting to the Duomation realtime server...</p>
+                  <h3 className="text-sm font-bold text-slate-900">Creating Secure Pairing Session</h3>
+                  <p className="text-xs text-slate-500 mt-1">Connecting to the Duomation realtime server...</p>
                 </div>
               </div>
             ) : qrState === 'error' ? (
               /* Case 3: QR generation error */
-              <div className="flex flex-col items-center justify-center bg-slate-950/80 rounded-xl p-6 border border-slate-800 text-center space-y-3">
-                <AlertTriangle className="w-8 h-8 text-amber-400" />
+              <div className="flex flex-col items-center justify-center bg-amber-50 rounded-2xl p-6 border border-amber-200 text-center space-y-3">
+                <AlertTriangle className="w-8 h-8 text-amber-600" />
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-200">QR Code Error</h3>
-                  <p className="text-xs text-slate-400 mt-1">{qrError || 'Unable to generate pairing QR.'}</p>
+                  <h3 className="text-sm font-bold text-amber-900">QR Code Error</h3>
+                  <p className="text-xs text-amber-700 mt-1">{qrError || 'Unable to generate pairing QR.'}</p>
                 </div>
-                <div className="w-full bg-slate-900 p-3 rounded-xl border border-slate-800">
-                  <span className="text-xs text-slate-400 block mb-1">Pairing Code:</span>
-                  <span className="text-2xl font-mono font-bold text-indigo-400">{code}</span>
+                <div className="w-full bg-white p-3.5 rounded-2xl border border-amber-200 shadow-sm">
+                  <span className="text-xs text-slate-500 block mb-1 font-medium">Pairing Code:</span>
+                  <span className="text-2xl font-mono font-bold text-indigo-600">{code}</span>
                 </div>
                 {code && (
                   <button
                     onClick={() => generateQR(code)}
-                    className="flex items-center gap-2 py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
+                    className="flex items-center gap-2 py-2 px-4 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-semibold transition-colors shadow-xs"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     Retry QR Generation
@@ -341,22 +336,22 @@ export const PairingModal: React.FC<PairingModalProps> = ({
             ) : (
               /* Case 4: QR Ready or Code Available */
               <>
-                <div className="flex flex-col items-center bg-white rounded-xl p-4 shadow-inner">
+                <div className="flex flex-col items-center bg-slate-50 border border-slate-200/90 rounded-2xl p-4 shadow-sm">
                   {qrState === 'generating' ? (
-                    <div className="w-56 h-56 flex flex-col items-center justify-center text-slate-500 p-4 text-center">
+                    <div className="w-52 h-52 flex flex-col items-center justify-center text-slate-500 p-4 text-center">
                       <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-2" />
                       <span className="text-xs text-slate-500 font-medium">Generating QR code...</span>
                     </div>
                   ) : qrDataUrl ? (
-                    <img src={qrDataUrl} alt="Pairing QR Code" className="w-56 h-56" />
+                    <img src={qrDataUrl} alt="Pairing QR Code" className="w-52 h-52 rounded-xl" />
                   ) : null}
                 </div>
 
                 <div className="text-center">
-                  <span className="text-xs uppercase tracking-wider text-slate-400 font-medium">
+                  <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold">
                     Pair Code for Device B:
                   </span>
-                  <div className="mt-1 text-3xl font-mono font-bold tracking-widest text-indigo-400 bg-slate-950/80 py-2.5 px-4 rounded-xl border border-indigo-500/20">
+                  <div className="mt-1.5 text-3xl font-mono font-bold tracking-widest text-indigo-600 bg-slate-50 py-3 px-4 rounded-2xl border border-slate-200 shadow-inner">
                     {code}
                   </div>
                 </div>
@@ -364,17 +359,17 @@ export const PairingModal: React.FC<PairingModalProps> = ({
                 <button
                   onClick={handleCopyLink}
                   disabled={!code}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-sm font-medium transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200/80 disabled:opacity-50 text-slate-700 text-sm font-semibold border border-slate-200/60 shadow-sm transition-all active:scale-[0.99]"
                 >
-                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-500" />}
                   {copied ? 'Direct Pairing Link Copied!' : 'Copy Direct Pairing Link'}
                 </button>
 
                 <div className="text-center py-1">
-                  <span className="inline-flex items-center gap-2 text-xs text-slate-400">
+                  <span className="inline-flex items-center gap-2 text-xs text-slate-500 font-medium">
                     <span
-                      className={`w-2 h-2 rounded-full ${
-                        hasDisplayDevice ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        hasDisplayDevice ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-amber-500 animate-pulse'
                       }`}
                     />
                     {hasDisplayDevice ? 'Device B Connected' : 'Waiting for Device B to connect...'}
@@ -388,20 +383,20 @@ export const PairingModal: React.FC<PairingModalProps> = ({
           <div className="space-y-5">
             {scanMode ? (
               <div className="space-y-3">
-                <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-black border border-slate-700 flex items-center justify-center">
+                <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-300 flex items-center justify-center shadow-md">
                   <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
                   <canvas ref={canvasRef} className="hidden" />
-                  <div className="absolute inset-0 border-2 border-indigo-500/50 rounded-xl pointer-events-none animate-pulse" />
+                  <div className="absolute inset-0 border-2 border-indigo-500/80 rounded-2xl pointer-events-none animate-pulse" />
                 </div>
                 {scanError && (
-                  <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-xl text-rose-300 text-xs">
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 p-3 rounded-2xl text-rose-700 text-xs">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
                     <span>{scanError}</span>
                   </div>
                 )}
                 <button
                   onClick={() => setScanMode(false)}
-                  className="w-full py-2.5 rounded-xl bg-slate-800 text-slate-300 text-sm font-medium hover:bg-slate-700 transition-colors"
+                  className="w-full py-2.5 rounded-2xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200 transition-colors border border-slate-200 shadow-xs"
                 >
                   Use Manual 6-Digit Code Instead
                 </button>
@@ -413,22 +408,22 @@ export const PairingModal: React.FC<PairingModalProps> = ({
                     setScanError(null);
                     setScanMode(true);
                   }}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-lg shadow-indigo-600/20 transition-all"
+                  className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold shadow-md shadow-indigo-500/20 active:scale-[0.99] transition-all"
                 >
                   <Camera className="w-5 h-5" />
                   Scan QR Code with Camera
                 </button>
 
-                <div className="relative flex items-center justify-center">
-                  <div className="border-t border-slate-800 w-full" />
-                  <span className="bg-slate-900 px-3 text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                <div className="relative flex items-center justify-center my-2">
+                  <div className="border-t border-slate-200 w-full" />
+                  <span className="bg-white px-3 text-xs text-slate-400 uppercase tracking-wider font-bold">
                     OR
                   </span>
                 </div>
 
-                <form onSubmit={handleManualSubmit} className="space-y-3">
+                <form onSubmit={handleManualSubmit} className="space-y-3.5">
                   <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
                       Enter 6-Character Pair Code:
                     </label>
                     <input
@@ -437,13 +432,13 @@ export const PairingModal: React.FC<PairingModalProps> = ({
                       onChange={(e) => setManualCode(e.target.value.toUpperCase())}
                       placeholder="e.g. K9X2P4"
                       maxLength={8}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-center text-xl font-mono tracking-widest text-white uppercase focus:outline-none focus:border-indigo-500 transition-colors"
+                      className="w-full px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center text-xl font-mono font-bold tracking-widest text-slate-900 uppercase focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors shadow-inner"
                     />
                   </div>
                   <button
                     type="submit"
                     disabled={manualCode.trim().length < 4}
-                    className="w-full py-3 rounded-xl bg-slate-800 hover:bg-indigo-600 disabled:opacity-40 text-white font-medium transition-colors"
+                    className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-40 text-white font-semibold shadow-md shadow-indigo-500/20 transition-all active:scale-[0.99]"
                   >
                     Connect as Display Monitor
                   </button>

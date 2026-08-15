@@ -170,15 +170,14 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   const initialPinchDistRef = useRef<number | null>(null);
   const initialZoomRef = useRef<number>(1);
 
-  // Autosave Project throttled
+  // Autosave Project throttled silently without popup
   const saveTimeoutRef = useRef<number | null>(null);
   const triggerAutosave = useCallback((updatedProject: Project) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = window.setTimeout(() => {
       saveProject(updatedProject);
-      showToast('Project saved');
     }, 1200);
-  }, [showToast]);
+  }, []);
 
   // Centralized Authoritative Mutation Commit
   const commitMutation = useCallback(
@@ -954,6 +953,106 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     });
   };
 
+  // Frame Clipboard & Advanced Timeline Operations
+  const [frameClipboard, setFrameClipboard] = useState<{ [layerId: string]: Stroke[] } | null>(null);
+
+  const handleCopyFrame = useCallback((index: number) => {
+    const frame = project.frames[index];
+    if (!frame) return;
+
+    const clipboardData: { [layerId: string]: Stroke[] } = {};
+    project.layers.forEach((layer) => {
+      const strokes = project.layerFrames[`${layer.id}:${frame.id}`];
+      if (strokes && strokes.length > 0) {
+        clipboardData[layer.id] = JSON.parse(JSON.stringify(strokes));
+      }
+    });
+
+    setFrameClipboard(clipboardData);
+    showToast(`Frame ${index + 1} copied`);
+  }, [project, showToast]);
+
+  const handlePasteFrame = useCallback((targetIndex: number) => {
+    if (!frameClipboard) {
+      showToast('Clipboard is empty. Copy a frame first.');
+      return;
+    }
+
+    const targetFrame = project.frames[targetIndex];
+    if (!targetFrame) return;
+
+    pushUndo(project);
+
+    commitMutation((prev) => {
+      const updatedLayerFrames = { ...prev.layerFrames };
+
+      prev.layers.forEach((layer) => {
+        const targetKey = `${layer.id}:${targetFrame.id}`;
+        const copiedStrokes = frameClipboard[layer.id];
+        if (copiedStrokes && copiedStrokes.length > 0) {
+          const pastedStrokes: Stroke[] = copiedStrokes.map((st) => ({
+            ...st,
+            id: 'st_paste_' + Math.random().toString(36).substring(2, 9),
+            frameId: targetFrame.id,
+            timestamp: Date.now(),
+          }));
+          updatedLayerFrames[targetKey] = pastedStrokes;
+        } else {
+          delete updatedLayerFrames[targetKey];
+        }
+      });
+
+      return {
+        ...prev,
+        layerFrames: updatedLayerFrames,
+      };
+    });
+
+    showToast(`Pasted into Frame ${targetIndex + 1}`);
+  }, [frameClipboard, project, pushUndo, commitMutation, showToast]);
+
+  const handleInsertFrameBefore = useCallback((index: number) => {
+    pushUndo(project);
+    const newFrame = {
+      id: 'frame_' + Math.random().toString(36).substring(2, 8),
+      name: `Frame ${project.frames.length + 1}`,
+      durationMultiplier: 1,
+    };
+
+    commitMutation((prev) => {
+      const updatedFrames = [...prev.frames];
+      updatedFrames.splice(index, 0, newFrame);
+      return {
+        ...prev,
+        frames: updatedFrames,
+      };
+    });
+
+    setActiveFrameIndex(index);
+    showToast(`Added frame in front of Frame ${index + 1}`);
+  }, [project, pushUndo, commitMutation, showToast]);
+
+  const handleInsertFrameAfter = useCallback((index: number) => {
+    pushUndo(project);
+    const newFrame = {
+      id: 'frame_' + Math.random().toString(36).substring(2, 8),
+      name: `Frame ${project.frames.length + 1}`,
+      durationMultiplier: 1,
+    };
+
+    commitMutation((prev) => {
+      const updatedFrames = [...prev.frames];
+      updatedFrames.splice(index + 1, 0, newFrame);
+      return {
+        ...prev,
+        frames: updatedFrames,
+      };
+    });
+
+    setActiveFrameIndex(index + 1);
+    showToast(`Added frame at back of Frame ${index + 1}`);
+  }, [project, pushUndo, commitMutation, showToast]);
+
   return (
    <div className="relative w-screen h-screen bg-[#f6f7fb] text-slate-950 flex flex-col justify-between overflow-hidden select-none pl-safe pr-safe pt-safe pb-safe">
       {/* Toast Notification Banner */}
@@ -1015,15 +1114,14 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
               </span>
             </button>
           </div>
-
           {/* Right: Undo/Redo, Export, Canvas Rotation, Fullscreen & Diagnostics */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Undo / Redo Group */}
-           <div className="flex items-center bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-xl p-0.5 shadow-sm">
+            <div className="flex items-center bg-white border border-slate-200/90 rounded-2xl p-0.5 shadow-2xs">
               <button
                 onClick={handleUndo}
                 disabled={undoStack.length === 0}
-                className="p-1.5 sm:p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/80 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                 title="Undo (Ctrl+Z)"
               >
                 <Undo2 className="w-4 h-4" />
@@ -1032,18 +1130,18 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
               <button
                 onClick={handleRedo}
                 disabled={redoStack.length === 0}
-                className="p-1.5 sm:p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/80 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                 title="Redo (Ctrl+Y)"
               >
                 <Redo2 className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="h-4 w-px bg-slate-800 mx-0.5 sm:mx-1" />
+            <div className="h-4 w-px bg-slate-200 mx-0.5 sm:mx-1" />
 
             <button
               onClick={() => setIsExportOpen(true)}
-              className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors flex items-center gap-1.5 text-xs font-medium shadow-sm"
+              className="p-2 rounded-2xl bg-white border border-slate-200/90 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
               title="Export Animation"
             >
               <Download className="w-4 h-4" />
@@ -1056,10 +1154,10 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
                 setCanvasRotation(nextRot);
                 showToast(nextRot === 0 ? 'Canvas Orientation: Standard' : `Canvas Rotated: ${nextRot}°`);
               }}
-              className={`p-2 rounded-xl transition-colors flex items-center gap-1 ${
+              className={`p-2 rounded-2xl transition-colors flex items-center gap-1 ${
                 canvasRotation !== 0
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 shadow-sm'
+                  : 'bg-white border border-slate-200/90 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 shadow-2xs'
               }`}
               title="Rotate Canvas Orientation (Shift+R)"
             >
@@ -1074,7 +1172,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
                 setIsFullScreenCanvas(true);
                 showToast('Full-Screen Canvas Active');
               }}
-            className="p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-colors shadow-sm"
+              className="p-2 rounded-2xl bg-white border border-slate-200/90 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-colors shadow-2xs"
               title="Full-Screen Canvas Mode (Shift+F)"
             >
               <Maximize2 className="w-4 h-4" />
@@ -1082,8 +1180,8 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
 
             <button
               onClick={() => setIsDiagnosticsOpen(!isDiagnosticsOpen)}
-              className={`p-2 rounded-xl transition-colors ${
-                isDiagnosticsOpen ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+              className={`p-2 rounded-2xl transition-colors ${
+                isDiagnosticsOpen ? 'bg-indigo-600 text-white shadow-md' : 'bg-white border border-slate-200/90 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 shadow-2xs'
               }`}
               title="Diagnostics"
             >
@@ -1102,27 +1200,27 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
               setIsFullScreenCanvas(false);
               showToast('Exited Full-Screen Canvas Mode');
             }}
-            className="fixed top-3 right-3 z-50 flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-900/60 hover:bg-slate-900 text-slate-300 hover:text-white border border-slate-700/60 shadow-2xl backdrop-blur-md opacity-40 hover:opacity-100 transition-all text-xs font-semibold group cursor-pointer"
+            className="fixed top-3 right-3 z-50 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/95 hover:bg-white text-slate-700 hover:text-indigo-600 border border-slate-200/90 shadow-2xl backdrop-blur-2xl opacity-70 hover:opacity-100 transition-all text-xs font-semibold group cursor-pointer"
             title="Exit Full-Screen Canvas (Esc or Shift+F)"
           >
-            <Minimize2 className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
-            <span className="hidden sm:inline font-medium">Exit Fullscreen</span>
+            <Minimize2 className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform" />
+            <span className="hidden sm:inline font-bold">Exit Fullscreen</span>
           </button>
         )}
 
         {/* Desktop Docked Left Toolbar */}
         {!isFullScreenCanvas && (
           isLeftToolsMinimized ? (
-            <aside className="hidden md:flex absolute top-4 left-3 z-20 flex-col items-center gap-2 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md p-1.5 rounded-2xl shadow-2xl w-10">
+            <aside className="hidden md:flex absolute top-4 left-3 z-20 flex-col items-center gap-2 bg-white/95 border border-slate-200/90 backdrop-blur-2xl p-2 rounded-2xl shadow-xl w-12">
               <button
                 onClick={() => setIsLeftToolsMinimized(false)}
-                className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-all group"
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-all group"
                 title="Expand Tools Panel"
               >
-                <ChevronRight className="w-4 h-4 text-indigo-400 group-hover:translate-x-0.5 transition-transform" />
+                <ChevronRight className="w-4 h-4 text-indigo-600 group-hover:translate-x-0.5 transition-transform" />
               </button>
               
-              <div className="w-5 h-px bg-slate-800 my-0.5" />
+              <div className="w-6 h-px bg-slate-200 my-0.5" />
 
               {/* Active Tool Icon */}
               {(() => {
@@ -1145,7 +1243,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
                 const ActiveIcon = toolsMap[toolSettings.activeTool] || Pencil;
                 return (
                   <div
-                    className="p-2 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
+                    className="p-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25"
                     title={`Active Tool: ${toolSettings.activeTool}`}
                   >
                     <ActiveIcon className="w-4 h-4" />
@@ -1168,7 +1266,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
                     <button
                       key={item.id}
                       onClick={() => setToolSettings({ ...toolSettings, activeTool: item.id as ToolType })}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                      className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                       title={item.label}
                     >
                       <Icon className="w-3.5 h-3.5" />
@@ -1178,15 +1276,12 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
               </div>
             </aside>
           ) : (
-            <aside className="hidden md:flex absolute top-4 left-4 z-20 flex-col items-center gap-1.5 bg-white/90
-border-slate-200/80
-shadow-xl
-max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
-              <div className="w-full flex items-center justify-between pb-1 border-b border-slate-200/80 mb-0.5 px-0.5">
-                <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">Tools</span>
+            <aside className="hidden md:flex absolute top-4 left-4 z-20 flex-col items-center gap-1.5 bg-white/95 border border-slate-200/90 p-2 rounded-[1.75rem] shadow-xl backdrop-blur-2xl max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
+              <div className="w-full flex items-center justify-between pb-1.5 border-b border-slate-200/80 mb-1 px-1">
+                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Tools</span>
                 <button
                   onClick={() => setIsLeftToolsMinimized(true)}
-                  className="p-1 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
+                  className="p-1 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                   title="Minimize Tools Panel"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
@@ -1211,7 +1306,7 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                 { id: 'ellipse', label: 'Circle (Key: C)', icon: Circle },
               ].map((item) => {
                 if ('isDivider' in item) {
-                  return <div key={item.id} className="w-6 h-px bg-slate-200 my-0.5" />;
+                  return <div key={item.id} className="w-7 h-px bg-slate-200/80 my-1" />;
                 }
                 const Icon = item.icon;
                 const isActive = toolSettings.activeTool === item.id;
@@ -1222,15 +1317,15 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                       setToolSettings({ ...toolSettings, activeTool: item.id as ToolType });
                       showToast(`${item.label.split(' ')[0]} selected`);
                     }}
-                    className={`p-2.5 rounded-xl transition-all relative group ${
+                    className={`p-2.5 rounded-2xl transition-all relative group ${
                       isActive
-                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105'
+                        ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25 scale-105'
                         : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'
                     }`}
                     title={item.label}
                   >
                     <Icon className="w-5 h-5" />
-                    <span className="absolute left-full ml-3 px-2 py-1 bg-slate-950 text-white text-[10px] font-medium rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-30">
+                    <span className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-950 text-white text-[11px] font-semibold rounded-xl shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-30">
                       {item.label}
                     </span>
                   </button>
@@ -1242,10 +1337,10 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
 
         {/* Mobile Compact Tool Selector Pill */}
         {!isFullScreenCanvas && (
-         <div className="flex md:hidden absolute top-2 left-2 sm:top-3 sm:left-3 z-20 flex-col items-center gap-1.5 bg-white/95 border border-slate-200 backdrop-blur-md p-1.5 rounded-2xl shadow-xl">
+          <div className="flex md:hidden absolute top-2 left-2 sm:top-3 sm:left-3 z-20 flex-col items-center gap-1.5 bg-white/95 border border-slate-200/90 backdrop-blur-2xl p-1.5 rounded-2xl shadow-xl">
             <button
               onClick={() => setIsMobileToolsOpen(true)}
-              className="p-2 rounded-xl bg-indigo-600 text-white shadow active:scale-95 transition-transform"
+              className="p-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/20 active:scale-95 transition-transform"
               title="Change Tool"
             >
               {(() => {
@@ -1277,38 +1372,38 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
           isBrushAdjustMinimized ? (
             <button
               onClick={() => setIsBrushAdjustMinimized(false)}
-              className="absolute top-3 right-3 z-20 p-2.5 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md rounded-2xl shadow-2xl text-indigo-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer active:scale-95 group"
+              className="absolute top-3 right-3 z-20 p-2.5 bg-white/95 border border-slate-200/90 backdrop-blur-2xl rounded-2xl shadow-xl text-indigo-600 hover:bg-slate-50 transition-all cursor-pointer active:scale-95 group"
               title="Expand Brush Adjustment Controls"
             >
               <Sliders className="w-4 h-4 group-hover:scale-110 transition-transform" />
             </button>
           ) : (
-          <aside className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 z-20 flex items-center gap-2 bg-white/90 border border-slate-200/80 backdrop-blur-md px-2 py-1 md:px-3 md:py-2 rounded-2xl shadow-xl text-xs">
+            <aside className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 z-20 flex items-center gap-2.5 bg-white/95 border border-slate-200/90 backdrop-blur-2xl px-3 py-2 rounded-2xl shadow-xl text-xs">
               {/* Color Palette Button */}
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => setIsColorPickerOpen(true)}
-                  className="flex items-center gap-1.5 p-1 pr-1.5 sm:p-1.5 sm:pr-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50 border border-slate-200 transition-all active:scale-95 group"
+                  className="flex items-center gap-1.5 p-1.5 pr-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/90 transition-all active:scale-95 group"
                   title="Open Color Palette & Picker"
                 >
                   <div
-                    className="w-4 h-4 sm:w-6 sm:h-6 rounded-lg border border-slate-600 shadow-inner flex items-center justify-center transition-transform group-hover:scale-105"
+                    className="w-5 h-5 rounded-lg border-2 border-slate-300 shadow-2xs flex items-center justify-center transition-transform group-hover:scale-105"
                     style={{ backgroundColor: toolSettings.color }}
                   />
-                <Palette className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 group-hover:text-indigo-600 transition-colors" />
-                  <span className="hidden lg:inline text-[11px] font-mono text-slate-300 uppercase">{toolSettings.color}</span>
+                  <Palette className="w-4 h-4 text-indigo-600 group-hover:text-indigo-700 transition-colors" />
+                  <span className="hidden lg:inline text-[11px] font-mono font-bold text-slate-700 uppercase">{toolSettings.color}</span>
                 </button>
 
                 {/* Quick Palette Swatches */}
-               <div className="hidden sm:flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-sm">
-                  {['#000000', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#FFFFFF'].map((c) => (
+                <div className="hidden sm:flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200/80 shadow-2xs">
+                  {['#000000', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1', '#8B5CF6', '#FFFFFF'].map((c) => (
                     <button
                       key={c}
                       onClick={() => handleColorChange(c)}
-                      className={`w-4 h-4 sm:w-5 sm:h-5 rounded-lg border transition-all ${
+                      className={`w-5 h-5 rounded-lg border-2 transition-all ${
                         toolSettings.color.toLowerCase() === c.toLowerCase()
-                          ? 'border-white scale-110 z-10 shadow'
-                           : 'border-slate-300 hover:border-indigo-300 hover:scale-105 '
+                          ? 'border-indigo-600 scale-110 z-10 shadow-sm'
+                          : 'border-slate-300 hover:border-indigo-400 hover:scale-105'
                       }`}
                       style={{ backgroundColor: c }}
                       title={c}
@@ -1317,21 +1412,21 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                 </div>
               </div>
 
-              {toolSettings.activeTool !== 'eyedropper' && <div className="h-4 w-px bg-slate-800" />}
+              {toolSettings.activeTool !== 'eyedropper' && <div className="h-4 w-px bg-slate-200" />}
 
               {/* Size Slider (0 to 200) */}
               {toolSettings.activeTool !== 'eyedropper' && toolSettings.activeTool !== 'fill' && (
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">Size</span>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="text-[10px] font-bold text-slate-500 hidden sm:inline">Size</span>
                   <input
                     type="range"
                     min={1}
                     max={200}
                     value={toolSettings.size}
                     onChange={(e) => setToolSettings({ ...toolSettings, size: Number(e.target.value) })}
-                    className="w-12 sm:w-24 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                    className="w-12 sm:w-24 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                   />
-                  <span className="text-[10px] font-mono text-slate-300 w-5 sm:w-7 text-right">
+                  <span className="text-[10px] font-mono font-bold text-slate-800 w-5 sm:w-7 text-right">
                     {toolSettings.size}
                   </span>
                 </div>
@@ -1340,9 +1435,9 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
               {/* Opacity Slider */}
               {toolSettings.activeTool !== 'eyedropper' && (
                 <>
-                  <div className="h-4 w-px bg-slate-800 hidden md:block" />
+                  <div className="h-4 w-px bg-slate-200 hidden md:block" />
                   <div className="hidden md:flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-slate-400">Opacity</span>
+                    <span className="text-[10px] font-bold text-slate-500">Opacity</span>
                     <input
                       type="range"
                       min={0.1}
@@ -1350,9 +1445,9 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                       step={0.05}
                       value={toolSettings.opacity}
                       onChange={(e) => setToolSettings({ ...toolSettings, opacity: Number(e.target.value) })}
-                      className="w-14 sm:w-16 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                      className="w-14 sm:w-16 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                     />
-                    <span className="text-[10px] font-mono text-slate-300 w-7 text-right">
+                    <span className="text-[10px] font-mono font-bold text-slate-800 w-7 text-right">
                       {Math.round(toolSettings.opacity * 100)}%
                     </span>
                   </div>
@@ -1362,18 +1457,18 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
               {/* Stabilizer Level */}
               {toolSettings.activeTool !== 'eyedropper' && toolSettings.activeTool !== 'fill' && (
                 <>
-                  <div className="h-4 w-px bg-slate-800 hidden lg:block" />
+                  <div className="h-4 w-px bg-slate-200 hidden lg:block" />
                   <div className="hidden lg:flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-slate-400">Smooth</span>
+                    <span className="text-[10px] font-bold text-slate-500">Smooth</span>
                     <input
                       type="range"
                       min={0}
                       max={10}
                       value={toolSettings.stabilizer}
                       onChange={(e) => setToolSettings({ ...toolSettings, stabilizer: Number(e.target.value) })}
-                      className="w-14 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                      className="w-14 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                     />
-                    <span className="text-[10px] font-mono text-slate-300 w-3 text-right">
+                    <span className="text-[10px] font-mono font-bold text-slate-800 w-3 text-right">
                       {toolSettings.stabilizer}
                     </span>
                   </div>
@@ -1382,14 +1477,14 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
 
               {/* Eyedropper hint */}
               {toolSettings.activeTool === 'eyedropper' && (
-                <span className="text-[11px] font-medium text-indigo-300 px-1">
+                <span className="text-[11px] font-bold text-indigo-600 px-1">
                   Tap canvas to sample color
                 </span>
               )}
 
               <button
                 onClick={() => setIsBrushAdjustMinimized(true)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ml-1"
+                className="p-1 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ml-1"
                 title="Minimize Brush Adjustments"
               >
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -1401,48 +1496,48 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
         {/* Zoom & Pan Overlay Controls */}
         {!isFullScreenCanvas && (
           isZoomPanelMinimized ? (
-            <aside className="absolute bottom-4 left-3 z-20 flex flex-col items-center gap-1.5 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md p-1.5 rounded-2xl shadow-2xl w-10">
+            <aside className="absolute bottom-4 left-3 z-20 flex flex-col items-center gap-1.5 bg-white/95 border border-slate-200/90 backdrop-blur-2xl p-2 rounded-2xl shadow-xl w-12">
               <button
                 onClick={() => setIsZoomPanelMinimized(false)}
-                className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
                 title="Expand View Adjustments"
               >
-                <Maximize2 className="w-3.5 h-3.5 text-indigo-400" />
+                <Maximize2 className="w-3.5 h-3.5 text-indigo-600" />
               </button>
-              <span className="font-mono text-[9px] font-bold text-slate-300">{Math.round(zoom * 100)}%</span>
+              <span className="font-mono text-[9px] font-bold text-slate-800">{Math.round(zoom * 100)}%</span>
               <button
                 onClick={() => {
                   const nextRot = (canvasRotation + 90) % 360;
                   setCanvasRotation(nextRot);
                   showToast(nextRot === 0 ? 'Canvas: Standard' : `Rotated: ${nextRot}°`);
                 }}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="p-1 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                 title="Rotate Canvas"
               >
                 <RotateCw className="w-3.5 h-3.5" />
               </button>
             </aside>
           ) : (
-            <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md px-2 py-1 rounded-xl shadow-xl text-xs">
+            <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1.5 bg-white/95 border border-slate-200/90 backdrop-blur-2xl px-3 py-2 rounded-2xl shadow-xl text-xs">
               <button
                 onClick={() => setZoom((prev) => Math.max(0.5, prev * 0.85))}
-                className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                className="p-1.5 text-slate-500 hover:text-indigo-600 rounded-xl hover:bg-indigo-50 transition-colors"
                 title="Zoom Out"
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
-              <span className="font-mono text-[11px] text-slate-300 w-12 text-center font-semibold">
+              <span className="font-mono text-[11px] text-slate-800 w-12 text-center font-bold">
                 {Math.round(zoom * 100)}%
               </span>
               <button
                 onClick={() => setZoom((prev) => Math.min(5, prev * 1.15))}
-                className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                className="p-1.5 text-slate-500 hover:text-indigo-600 rounded-xl hover:bg-indigo-50 transition-colors"
                 title="Zoom In"
               >
                 <ChevronDown className="w-3.5 h-3.5 rotate-180" />
               </button>
 
-              <div className="h-3.5 w-px bg-slate-800 mx-0.5" />
+              <div className="h-3.5 w-px bg-slate-200 mx-0.5" />
 
               {/* Rotate Canvas Button */}
               <button
@@ -1451,10 +1546,10 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                   setCanvasRotation(nextRot);
                   showToast(nextRot === 0 ? 'Canvas Orientation: Standard' : `Canvas Rotated: ${nextRot}°`);
                 }}
-                className={`p-1 rounded transition-colors flex items-center gap-1 ${
+                className={`p-1.5 rounded-xl transition-colors flex items-center gap-1 ${
                   canvasRotation !== 0
-                    ? 'bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600 hover:text-white font-medium'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    ? 'bg-indigo-50 text-indigo-600 font-bold border border-indigo-200'
+                    : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'
                 }`}
                 title="Rotate Canvas Orientation (Shift+R)"
               >
@@ -1469,7 +1564,7 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                   setIsFullScreenCanvas(true);
                   showToast('Full-Screen Canvas Active');
                 }}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="p-1.5 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                 title="Full-Screen Canvas Mode (Shift+F)"
               >
                 <Maximize2 className="w-3.5 h-3.5" />
@@ -1483,7 +1578,7 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                     setCanvasRotation(0);
                     showToast('View Reset');
                   }}
-                  className="ml-1 px-1.5 py-0.5 rounded bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600 hover:text-white text-[10px] font-semibold transition-colors"
+                  className="ml-1 px-2 py-1 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 hover:bg-indigo-100 text-[10px] font-bold transition-colors shadow-2xs"
                   title="Reset Zoom, Pan, and Canvas Rotation"
                 >
                   Reset
@@ -1492,7 +1587,7 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
 
               <button
                 onClick={() => setIsZoomPanelMinimized(true)}
-                className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors ml-0.5"
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-colors ml-0.5"
                 title="Minimize View Adjustments"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
@@ -1528,6 +1623,11 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
           onAddFrame={handleAddFrame}
           onDuplicateFrame={handleDuplicateFrame}
           onDeleteFrame={handleDeleteFrame}
+          onCopyFrame={handleCopyFrame}
+          onPasteFrame={handlePasteFrame}
+          onInsertFrameBefore={handleInsertFrameBefore}
+          onInsertFrameAfter={handleInsertFrameAfter}
+          hasClipboardData={frameClipboard !== null && Object.keys(frameClipboard).length > 0}
           onTogglePlay={() => setIsPlaying(!isPlaying)}
           onChangeFps={(newFps) => {
             const updated = {
@@ -1661,17 +1761,20 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
       />
 
       {/* Mobile Tool Selection Modal Drawer */}
+      {/* Mobile Tool Selector Modal */}
       {isMobileToolsOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-2 sm:p-4">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-4 text-slate-950 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <Wrench className="w-5 h-5 text-indigo-400" />
-                <h3 className="font-bold text-white text-sm">Select Drawing Tool</h3>
+        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-md flex items-end sm:items-center justify-center p-2 sm:p-4">
+          <div className="w-full max-w-md bg-white/95 border border-slate-200/90 rounded-[2rem] p-6 text-slate-950 shadow-[0_30px_90px_rgba(15,23,42,0.18)] backdrop-blur-2xl space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3.5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+                  <Wrench className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-slate-950 text-base">Select Drawing Tool</h3>
               </div>
               <button
                 onClick={() => setIsMobileToolsOpen(false)}
-                className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1705,16 +1808,15 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                     }}
                     className={`flex items-center gap-2.5 p-2.5 rounded-2xl border text-left transition-all active:scale-95 ${
                       isActive
-                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/30'
-                        :
- 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200'
+                        ? 'bg-gradient-to-r from-indigo-600 to-violet-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20'
+                        : 'bg-white border-slate-200/90 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200'
                     }`}
                   >
-                   <div className={`p-2 rounded-xl flex-shrink-0 ${isActive ? 'bg-white/20' : 'bg-indigo-50 text-indigo-600'}`}>
+                    <div className={`p-2 rounded-xl flex-shrink-0 ${isActive ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'}`}>
                       <Icon className="w-4 h-4" />
                     </div>
                     <div className="truncate">
-                     <div className="font-semibold text-xs text-slate-800 truncate">{tool.label}</div>
+                      <div className={`font-semibold text-xs truncate ${isActive ? 'text-white' : 'text-slate-900'}`}>{tool.label}</div>
                       <div className={`text-[10px] truncate ${isActive ? 'text-indigo-100' : 'text-slate-500'}`}>{tool.desc}</div>
                     </div>
                   </button>
@@ -1724,10 +1826,10 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
 
             {/* Mobile Tool Size Adjustment (1 to 200) */}
             {toolSettings.activeTool !== 'eyedropper' && toolSettings.activeTool !== 'fill' && (
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-1.5">
+              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 space-y-2">
                 <div className="flex items-center justify-between text-xs">
-             <span className="font-semibold text-slate-700">Stroke Size</span> 
-                  <span className="font-mono text-indigo-400 font-bold">{toolSettings.size}px</span>
+                  <span className="font-bold text-slate-700">Stroke Size</span> 
+                  <span className="font-mono text-indigo-600 font-bold">{toolSettings.size}px</span>
                 </div>
                 <input
                   type="range"
@@ -1735,7 +1837,7 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                   max={200}
                   value={toolSettings.size}
                   onChange={(e) => setToolSettings({ ...toolSettings, size: Number(e.target.value) })}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                 />
               </div>
             )}

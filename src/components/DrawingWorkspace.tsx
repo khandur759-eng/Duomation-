@@ -1283,12 +1283,12 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
               <Sliders className="w-4 h-4 group-hover:scale-110 transition-transform" />
             </button>
           ) : (
-            <aside className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 z-20 flex items-center gap-2 bg-slate-900/90 border border-slate-800/90 backdrop-blur-md px-2 py-1 md:px-3 md:py-2 rounded-2xl shadow-2xl text-xs">
+          <aside className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 z-20 flex items-center gap-2 bg-white/90 border border-slate-200/80 backdrop-blur-md px-2 py-1 md:px-3 md:py-2 rounded-2xl shadow-xl text-xs">
               {/* Color Palette Button */}
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => setIsColorPickerOpen(true)}
-                  className="flex items-center gap-1.5 p-1 pr-1.5 sm:p-1.5 sm:pr-2.5 rounded-xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700/80 transition-all active:scale-95 group"
+                  className="flex items-center gap-1.5 p-1 pr-1.5 sm:p-1.5 sm:pr-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50 border border-slate-200 transition-all active:scale-95 group"
                   title="Open Color Palette & Picker"
                 >
                   <div

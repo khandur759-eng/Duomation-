@@ -210,7 +210,9 @@ export const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
                           key={color}
                           onClick={() => handleColorChange(color)}
                           className={`w-7 h-7 rounded-xl border flex items-center justify-center transition-all hover:scale-110 active:scale-95 ${
-                            isSelected ? 'border-white ring-2 ring-indigo-500/50 scale-105 z-10' : 'border-slate-800 hover:border-slate-600'
+                            isSelected
+  ? 'border-white ring-2 ring-indigo-500/50 scale-105 z-10'
+  : 'border-slate-300 hover:border-indigo-300'
                           }`}
                           style={{ backgroundColor: color }}
                           title={color}

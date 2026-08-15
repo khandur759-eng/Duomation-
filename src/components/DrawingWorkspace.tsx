@@ -1308,7 +1308,7 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                       className={`w-4 h-4 sm:w-5 sm:h-5 rounded-lg border transition-all ${
                         toolSettings.color.toLowerCase() === c.toLowerCase()
                           ? 'border-white scale-110 z-10 shadow'
-                           :border-slate-300 hover:border-indigo-300 hover:scale-105
+                           : 'border-slate-300 hover:border-indigo-300 hover:scale-105 '
                       }`}
                       style={{ backgroundColor: c }}
                       title={c}

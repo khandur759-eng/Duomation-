@@ -1706,7 +1706,8 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
                     className={`flex items-center gap-2.5 p-2.5 rounded-2xl border text-left transition-all active:scale-95 ${
                       isActive
                         ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/30'
-                        : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:border-slate-700'
+                        :
+ 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200'
                     }`}
                   >
                     <div className={`p-2 rounded-xl flex-shrink-0 ${isActive ? 'bg-white/20' : 'bg-slate-900 text-indigo-400'}`}>

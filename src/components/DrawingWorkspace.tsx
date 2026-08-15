@@ -1663,7 +1663,7 @@ max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
       {/* Mobile Tool Selection Modal Drawer */}
       {isMobileToolsOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-2 sm:p-4">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-4 text-slate-100 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
+          className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-4 text-slate-950 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar"
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <Wrench className="w-5 h-5 text-indigo-400" />

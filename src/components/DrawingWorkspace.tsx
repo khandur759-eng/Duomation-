@@ -122,6 +122,26 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   // Zoom & Pan state
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  // Canvas Rotation (0, 90, 180, 270 degrees)
+  const [canvasRotation, setCanvasRotation] = useState<number>(0);
+
+  // Refs for zero-latency gesture updates and event listeners
+  const zoomRef = useRef<number>(1);
+  const panRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const canvasRotationRef = useRef<number>(0);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  useEffect(() => {
+    panRef.current = pan;
+  }, [pan]);
+
+  useEffect(() => {
+    canvasRotationRef.current = canvasRotation;
+  }, [canvasRotation]);
 
   // Real-time Drawing state
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
@@ -157,18 +177,17 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     } catch (e) {}
   };
 
-  // Canvas Rotation (0, 90, 180, 270 degrees)
-  const [canvasRotation, setCanvasRotation] = useState<number>(0);
-
   // Pan & Spacebar State
   const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
   const isPanningRef = useRef<boolean>(false);
   const lastPanPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Touch Gesture tracking for Pinch-to-Zoom & Pan
+  // Touch Gesture tracking for Pinch-to-Zoom, 360° Rotation & Pan
   const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const initialPinchDistRef = useRef<number | null>(null);
-  const initialZoomRef = useRef<number>(1);
+  const isNavigatingRef = useRef<boolean>(false);
+  const lastPinchDistRef = useRef<number | null>(null);
+  const lastPinchMidpointRef = useRef<{ x: number; y: number } | null>(null);
+  const lastPinchAngleRef = useRef<number | null>(null);
 
   // Autosave Project throttled silently without popup
   const saveTimeoutRef = useRef<number | null>(null);
@@ -236,6 +255,65 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
   const rafIdRef = useRef<number | null>(null);
   const lastNetworkSyncTimeRef = useRef<number>(0);
 
+  // Helper to apply zoom and pan around a focal point in screen coordinates
+  const applyZoomAndPan = useCallback(
+    (
+      newZoomRaw: number,
+      focalPointScreen?: { x: number; y: number },
+      deltaScreen?: { x: number; y: number }
+    ) => {
+      const canvas = canvasRef.current;
+      const currentZoom = zoomRef.current;
+      const currentPan = panRef.current;
+      const rotation = canvasRotationRef.current;
+
+      // Clamp zoom to [0.2, 8.0] (20% to 800%) and protect against NaN/Infinity
+      const newZoom = Math.min(8.0, Math.max(0.2, isFinite(newZoomRaw) ? newZoomRaw : currentZoom));
+      const scaleFactor = newZoom / currentZoom;
+
+      let nextPanX = currentPan.x;
+      let nextPanY = currentPan.y;
+
+      const rad = (-rotation * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+
+      // If screen pan delta is provided (e.g. from moving fingers / dragging)
+      if (deltaScreen) {
+        const localDeltaX = deltaScreen.x * cos - deltaScreen.y * sin;
+        const localDeltaY = deltaScreen.x * sin + deltaScreen.y * cos;
+        nextPanX += localDeltaX;
+        nextPanY += localDeltaY;
+      }
+
+      // If focal point is provided and zoom changed, anchor the zoom around the focal point
+      if (focalPointScreen && canvas && Math.abs(scaleFactor - 1) > 0.00001) {
+        const rect = canvas.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        const dx = focalPointScreen.x - centerX;
+        const dy = focalPointScreen.y - centerY;
+
+        const localFx = dx * cos - dy * sin;
+        const localFy = dx * sin + dy * cos;
+
+        // Focal point anchoring formula:
+        nextPanX = nextPanX - (localFx - currentPan.x) * (scaleFactor - 1);
+        nextPanY = nextPanY - (localFy - currentPan.y) * (scaleFactor - 1);
+      }
+
+      // Guard against non-finite pan values
+      if (isFinite(nextPanX) && isFinite(nextPanY)) {
+        panRef.current = { x: nextPanX, y: nextPanY };
+        zoomRef.current = newZoom;
+        setZoom(newZoom);
+        setPan({ x: nextPanX, y: nextPanY });
+      }
+    },
+    []
+  );
+
   // Wheel zoom and pan listener on container with focal-point cursor zooming
   useEffect(() => {
     const container = containerRef.current;
@@ -246,32 +324,20 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
       if (e.ctrlKey || e.metaKey || !e.shiftKey) {
         // Zoom towards pointer focal point
         const zoomFactor = e.deltaY < 0 ? 1.12 : 0.88;
-        setZoom((prevZoom) => {
-          const newZoom = Math.min(8, Math.max(0.2, prevZoom * zoomFactor));
-          if (canvasRef.current) {
-            const rect = canvasRef.current.getBoundingClientRect();
-            const offsetX = e.clientX - (rect.left + rect.width / 2);
-            const offsetY = e.clientY - (rect.top + rect.height / 2);
-            const scaleRatio = newZoom / prevZoom - 1;
-            setPan((prevPan) => ({
-              x: prevPan.x - offsetX * scaleRatio,
-              y: prevPan.y - offsetY * scaleRatio,
-            }));
-          }
-          return newZoom;
-        });
+        const proposedZoom = zoomRef.current * zoomFactor;
+        applyZoomAndPan(proposedZoom, { x: e.clientX, y: e.clientY });
       } else {
-        // Pan
-        setPan((prev) => ({
-          x: prev.x - e.deltaX,
-          y: prev.y - e.deltaY,
-        }));
+        // Pan (Shift + Wheel or trackpad pan)
+        applyZoomAndPan(zoomRef.current, undefined, {
+          x: -e.deltaX,
+          y: -e.deltaY,
+        });
       }
     };
 
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
-  }, []);
+  }, [applyZoomAndPan]);
 
   // Keyboard Shortcuts Handler
   useEffect(() => {
@@ -344,11 +410,11 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
 
       if ((e.shiftKey || e.altKey) && key === 'r') {
         e.preventDefault();
-        setCanvasRotation((prev) => {
-          const next = (prev + 90) % 360;
-          showToast(next === 0 ? 'Canvas Orientation: Standard' : `Canvas Rotated: ${next}°`);
-          return next;
-        });
+        const next = (Math.round(canvasRotationRef.current / 90) * 90 + 90) % 360;
+        canvasRotationRef.current = next;
+        setCanvasRotation(next);
+        renderPass();
+        showToast(next === 0 ? 'Canvas Orientation: Standard (0°)' : `Canvas Rotated: ${next}°`);
         return;
       }
 
@@ -373,11 +439,15 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     };
   }, [handleUndo, handleRedo, showToast]);
 
-  // Convert client pixel position into normalized [0..1] canvas point considering Pan, Zoom, and Rotation
+  // Convert client pixel position into normalized [0..1] canvas point considering instantaneous Pan, Zoom, and Rotation
   const getNormalizedPoint = useCallback((clientX: number, clientY: number, pressureVal: number = 0.5): Point => {
     if (!canvasRef.current) return { x: 0, y: 0, pressure: pressureVal };
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
+
+    const currentZoom = zoomRef.current;
+    const currentPan = panRef.current;
+    const currentRotation = canvasRotationRef.current;
 
     // Center of visual bounding box on screen
     const centerX = rect.left + rect.width / 2;
@@ -387,8 +457,8 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     const dx = clientX - centerX;
     const dy = clientY - centerY;
 
-    // Rotate (dx, dy) back by -canvasRotation
-    const rad = (-canvasRotation * Math.PI) / 180;
+    // Rotate (dx, dy) back by -currentRotation
+    const rad = (-currentRotation * Math.PI) / 180;
     const localDx = dx * Math.cos(rad) - dy * Math.sin(rad);
     const localDy = dx * Math.sin(rad) + dy * Math.cos(rad);
 
@@ -397,20 +467,16 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     const unrotatedWidth = canvas.width / dpr;
     const unrotatedHeight = canvas.height / dpr;
 
-    // Raw normalized point on unrotated canvas before pan & zoom
-    const rawX = localDx / unrotatedWidth + 0.5;
-    const rawY = localDy / unrotatedHeight + 0.5;
-
     // Apply Pan and Zoom reversal
-    const normX = (rawX - 0.5 - pan.x / unrotatedWidth) / zoom + 0.5;
-    const normY = (rawY - 0.5 - pan.y / unrotatedHeight) / zoom + 0.5;
+    const normX = (localDx - currentPan.x) / (unrotatedWidth * currentZoom) + 0.5;
+    const normY = (localDy - currentPan.y) / (unrotatedHeight * currentZoom) + 0.5;
 
     return {
       x: Math.max(0, Math.min(1, normX)),
       y: Math.max(0, Math.min(1, normY)),
       pressure: pressureVal,
     };
-  }, [zoom, pan, canvasRotation]);
+  }, []);
 
   // Subscribe to snapshot requests from Device B
   useEffect(() => {
@@ -423,7 +489,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     return () => unsubscribe();
   }, [project, activeFrameIndex]);
 
-  // Synchronize canvas rendering with live cursor overlay
+  // Synchronize canvas rendering with live cursor overlay (instantaneous zero-latency rendering)
   const renderPass = useCallback(() => {
     if (!canvasRef.current) return;
 
@@ -445,22 +511,27 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
           }
         : null;
 
+    const dpr = window.devicePixelRatio || 1;
+    const currentZoom = zoomRef.current;
+    const currentPan = panRef.current;
+    const currentRotation = canvasRotationRef.current;
+
     renderCanvasFrame({
       canvas: canvasRef.current,
       project,
       activeFrameIndex,
       activeLayerId,
       activeStroke,
-      zoom,
-      panX: pan.x,
-      panY: pan.y,
+      zoom: currentZoom,
+      panX: currentPan.x * dpr,
+      panY: currentPan.y * dpr,
       showOnionSkin: project.settings.onionSkin.enabled,
     });
 
     // Draw live brush/tool cursor overlay
     const ctx = canvasRef.current.getContext('2d');
     if (ctx && cursorPosRef.current.visible) {
-      drawCursorOverlay(ctx, cursorPosRef.current, toolSettings, zoom, canvasRef.current, canvasRotation);
+      drawCursorOverlay(ctx, cursorPosRef.current, toolSettings, currentZoom, canvasRef.current, currentRotation);
     }
   }, [
     project,
@@ -469,9 +540,6 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     isDrawing,
     currentStrokePoints,
     toolSettings,
-    zoom,
-    pan,
-    canvasRotation,
   ]);
 
   // Handle Resize and DPR
@@ -483,31 +551,30 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     const dpr = window.devicePixelRatio || 1;
 
     const targetAspect = (project.settings?.width || 1920) / (project.settings?.height || 1080);
-    const isRotated90 = canvasRotation === 90 || canvasRotation === 270;
-    const effTargetAspect = isRotated90 ? 1 / targetAspect : targetAspect;
     const containerAspect = rect.width / rect.height;
 
     let visualWidth = rect.width;
     let visualHeight = rect.height;
 
-    if (containerAspect > effTargetAspect) {
+    if (containerAspect > targetAspect) {
       visualHeight = rect.height;
-      visualWidth = rect.height * effTargetAspect;
+      visualWidth = rect.height * targetAspect;
     } else {
       visualWidth = rect.width;
-      visualHeight = rect.width / effTargetAspect;
+      visualHeight = rect.width / targetAspect;
     }
 
-    const displayWidth = isRotated90 ? visualHeight : visualWidth;
-    const displayHeight = isRotated90 ? visualWidth : visualHeight;
+    canvas.style.width = `${visualWidth}px`;
+    canvas.style.height = `${visualHeight}px`;
 
-    canvas.style.width = `${displayWidth}px`;
-    canvas.style.height = `${displayHeight}px`;
-
-    canvas.width = Math.round(displayWidth * dpr);
-    canvas.height = Math.round(displayHeight * dpr);
+    const targetW = Math.round(visualWidth * dpr);
+    const targetH = Math.round(visualHeight * dpr);
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+    }
     renderPass();
-  }, [project.settings?.width, project.settings?.height, canvasRotation, renderPass]);
+  }, [project.settings?.width, project.settings?.height, renderPass]);
 
   useEffect(() => {
     updateCanvasBounds();
@@ -587,7 +654,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
 
     cursorPosRef.current = { x: e.clientX, y: e.clientY, visible: true };
 
-    // Track active pointer for pinch-zoom
+    // Register active pointer
     activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     // Handle spacebar pan or middle mouse button pan
@@ -598,18 +665,41 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
       return;
     }
 
-    // Two-finger pinch gesture detected
+    // Two or more fingers detected -> Enter gesture navigation mode
     if (activePointersRef.current.size >= 2) {
-      isDrawingRef.current = false;
-      setIsDrawing(false);
-      currentStrokePointsRef.current = [];
-      setCurrentStrokePoints([]);
+      isNavigatingRef.current = true;
+
+      // Abort any single-finger active stroke cleanly
+      if (isDrawingRef.current) {
+        setUndoStack((prev) => (prev.length > 0 ? prev.slice(0, prev.length - 1) : prev));
+        isDrawingRef.current = false;
+        setIsDrawing(false);
+        currentStrokePointsRef.current = [];
+        setCurrentStrokePoints([]);
+        unsentPointsRef.current = [];
+        currentStrokeIdRef.current = null;
+        if (rafIdRef.current) {
+          cancelAnimationFrame(rafIdRef.current);
+          rafIdRef.current = null;
+        }
+      }
+
       const pts = Array.from(activePointersRef.current.values()) as { x: number; y: number }[];
-      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-      initialPinchDistRef.current = dist;
-      initialZoomRef.current = zoom;
+      const p1 = pts[0];
+      const p2 = pts[1];
+
+      lastPinchMidpointRef.current = {
+        x: (p1.x + p2.x) / 2,
+        y: (p1.y + p2.y) / 2,
+      };
+      lastPinchDistRef.current = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+
+      renderPass();
       return;
     }
+
+    // If currently in navigation mode from prior multi-touch, ignore until all fingers are lifted
+    if (isNavigatingRef.current) return;
 
     // Verify active layer is unlocked and visible
     const currentLayer = project.layers.find((l) => l.id === activeLayerId);
@@ -707,26 +797,54 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
 
     // Handle spacebar / middle-mouse panning
     if (isPanningRef.current) {
-      const dx = e.clientX - lastPanPosRef.current.x;
-      const dy = e.clientY - lastPanPosRef.current.y;
-      setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+      const deltaX = e.clientX - lastPanPosRef.current.x;
+      const deltaY = e.clientY - lastPanPosRef.current.y;
       lastPanPosRef.current = { x: e.clientX, y: e.clientY };
+      applyZoomAndPan(zoomRef.current, undefined, { x: deltaX, y: deltaY });
       renderPass();
       return;
     }
 
-    // Two-finger pinch zoom
-    if (activePointersRef.current.size >= 2 && initialPinchDistRef.current) {
+    // Two-finger pinch zoom & simultaneous free pan
+    if (activePointersRef.current.size >= 2) {
       const pts = Array.from(activePointersRef.current.values()) as { x: number; y: number }[];
-      const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-      const scale = currentDist / initialPinchDistRef.current;
-      const newZoom = Math.min(8, Math.max(0.2, initialZoomRef.current * scale));
-      setZoom(newZoom);
+      const p1 = pts[0];
+      const p2 = pts[1];
+
+      const currentMidpoint = {
+        x: (p1.x + p2.x) / 2,
+        y: (p1.y + p2.y) / 2,
+      };
+      const currentDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+
+      if (
+        lastPinchMidpointRef.current &&
+        lastPinchDistRef.current &&
+        lastPinchDistRef.current > 0 &&
+        currentDist > 0
+      ) {
+        const prevMidpoint = lastPinchMidpointRef.current;
+        const prevDist = lastPinchDistRef.current;
+
+        const scale = currentDist / prevDist;
+        const proposedZoom = zoomRef.current * scale;
+
+        const screenDelta = {
+          x: currentMidpoint.x - prevMidpoint.x,
+          y: currentMidpoint.y - prevMidpoint.y,
+        };
+
+        applyZoomAndPan(proposedZoom, prevMidpoint, screenDelta);
+      }
+
+      lastPinchMidpointRef.current = currentMidpoint;
+      lastPinchDistRef.current = currentDist;
       renderPass();
       return;
     }
 
-    if (!isDrawingRef.current || !canvasRef.current) {
+    // If in navigation mode or not actively drawing, skip drawing strokes
+    if (isNavigatingRef.current || !isDrawingRef.current || !canvasRef.current) {
       renderPass();
       return;
     }
@@ -755,21 +873,28 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     cursorPosRef.current = { x: e.clientX, y: e.clientY, visible: false };
     activePointersRef.current.delete(e.pointerId);
 
+    if (canvasRef.current && canvasRef.current.hasPointerCapture(e.pointerId)) {
+      try {
+        canvasRef.current.releasePointerCapture(e.pointerId);
+      } catch (err) {}
+    }
+
     if (isPanningRef.current) {
       isPanningRef.current = false;
     }
 
     if (activePointersRef.current.size < 2) {
-      initialPinchDistRef.current = null;
+      lastPinchMidpointRef.current = null;
+      lastPinchDistRef.current = null;
+    }
+
+    if (activePointersRef.current.size === 0) {
+      isNavigatingRef.current = false;
     }
 
     if (!isDrawingRef.current) {
       renderPass();
       return;
-    }
-
-    if (canvasRef.current && canvasRef.current.hasPointerCapture(e.pointerId)) {
-      canvasRef.current.releasePointerCapture(e.pointerId);
     }
 
     isDrawingRef.current = false;
@@ -849,14 +974,34 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
     }
   };
 
-
   const handlePointerCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    activePointersRef.current.delete(e.pointerId);
     if (canvasRef.current && canvasRef.current.hasPointerCapture(e.pointerId)) {
-      canvasRef.current.releasePointerCapture(e.pointerId);
+      try {
+        canvasRef.current.releasePointerCapture(e.pointerId);
+      } catch (err) {}
     }
-    setIsDrawing(false);
-    setCurrentStrokePoints([]);
-    currentStrokeIdRef.current = null;
+    if (activePointersRef.current.size < 2) {
+      lastPinchMidpointRef.current = null;
+      lastPinchDistRef.current = null;
+    }
+    if (activePointersRef.current.size === 0) {
+      isNavigatingRef.current = false;
+      isPanningRef.current = false;
+    }
+    if (isDrawingRef.current) {
+      isDrawingRef.current = false;
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      currentStrokePointsRef.current = [];
+      unsentPointsRef.current = [];
+      currentStrokeIdRef.current = null;
+      setIsDrawing(false);
+      setCurrentStrokePoints([]);
+    }
+    renderPass();
   };
 
   // Timeline Handlers
@@ -1603,7 +1748,7 @@ export const DrawingWorkspace: React.FC<DrawingWorkspaceProps> = ({
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
             onPointerEnter={handlePointerEnter}
             onPointerLeave={handlePointerLeave}
             style={{ transform: `rotate(${canvasRotation}deg)` }}
